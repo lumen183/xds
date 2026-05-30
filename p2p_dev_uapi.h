@@ -30,7 +30,7 @@ struct va_desc_ba {
     int count;
 };
 
-struct read_desc {
+struct read_desc_ba {
     struct va_desc_ba desc;
     int bdev_fd;
     unsigned int nsid;

@@ -25,6 +25,16 @@ void close_p2p_fd(int dev_fd)
     close(dev_fd);
 }
 
+int drain_read(int dev_fd)
+{
+    int err;
+
+    err = ioctl(dev_fd, IOCTL_DRAIN_READ, 0);
+    if (err < 0)
+        return -errno;
+    return 0;
+}
+
 int new_p2p_fd(void)
 {
     int dev_fd;
@@ -254,8 +264,8 @@ int read_file_batch(int dev_fd, struct read_parameter *param, int param_num)
     }
 
     read->desc.hostpid = getpid();
-    read->desc.devid = param->devid;
-    read->desc.vfid = param->vfid;
+    read->desc.devid = param[0].devid;
+    read->desc.vfid = param[0].vfid;
     read->desc.count = param_num;
     read->bdev_fd = bdev_fd;
     read->nsid = 1;

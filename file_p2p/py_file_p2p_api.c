@@ -43,7 +43,10 @@ static PyObject *py_read_file_batch(PyObject *self, PyObject *args)
     int dev_fd = 0;
     const char *file_name = NULL;
     const char *bdev_name = NULL;
+    unsigned short devid = 0;
+    unsigned short vfid = 0;
     PyObject *py_list = NULL;
+    int ret = 0;
 
     if (!PyArg_ParseTuple(args, "issO", &dev_fd, &file_name, &bdev_name, &py_list)) {
         return PyLong_FromLong((long)-1);
@@ -60,16 +63,16 @@ static PyObject *py_read_file_batch(PyObject *self, PyObject *args)
         return PyLong_FromLong((long)-1);
     }
 
-    struct read_params *params = malloc(n * sizeof(struct read_params));
+    struct read_parameter *params = malloc(n * sizeof(struct read_parameter));
     if (params == NULL) {
-        PyErr_SetString(PyExc_MemoryError, "malloc read_params failed");
+        PyErr_SetString(PyExc_MemoryError, "malloc read_parameter failed");
         return PyLong_FromLong((long)-1);
     }
 
     for (Py_ssize_t i = 0; i < n; i++) {
         PyObject *py_item = PyList_GetItem(py_list, i);
         if (!PyTuple_Check(py_item) && !PyList_Check(py_item)) {
-            PyErr_SetString(PyExc_TypeError, "third arg must be a list/tuple of at list 3 elements (bdev_offset, addr, size)");
+            PyErr_SetString(PyExc_TypeError, "third arg must be a list/tuple of at least 3 elements (bdev_offset, addr, size)");
             free(params);
             return PyLong_FromLong((long)-1);
         }
@@ -83,7 +86,7 @@ static PyObject *py_read_file_batch(PyObject *self, PyObject *args)
         Py_ssize_t len = PySequence_Fast_GET_SIZE(seq);
         if (len < 3) {
             Py_DECREF(seq);
-            PyErr_SetString(PyExc_TypeError, "entry must be a sequence of at list 3 elements (bdev_offset, addr, size)");
+            PyErr_SetString(PyExc_TypeError, "entry must be a sequence of at least 3 elements (bdev_offset, addr, size)");
             free(params);
             return PyLong_FromLong((long)-1);
         }
@@ -96,17 +99,17 @@ static PyObject *py_read_file_batch(PyObject *self, PyObject *args)
         params[i].vfid = vfid;
         params[i].bdev_offset = PyLong_AsUnsignedLongLong(items[0]);
         params[i].addr = PyLong_AsUnsignedLongLong(items[1]);
-        params[i].size = PyLong_AsUnsignedLongLong(items[2]);
+        params[i].size = (unsigned int)PyLong_AsUnsignedLongLong(items[2]);
 
         Py_DECREF(seq);
     }
 
     Py_BEGIN_ALLOW_THREADS
-    ret = read_file_batch(dev_fd, params, n);
+    ret = read_file_batch(dev_fd, params, (int)n);
     Py_END_ALLOW_THREADS
 
     free(params);
-    return PyLong_FromLong((long)0);
+    return PyLong_FromLong((long)ret);
 }
 
 static PyObject *py_drain_read(PyObject *self, PyObject *args)

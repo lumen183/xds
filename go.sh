@@ -2,7 +2,7 @@ set -e
 
 addr=$(awk '/__tracepoint_nvme_setup_cmd/ {print $1}' /proc/kallsyms)
 
-[-z "$addr" ] && { echo "no nvme_setup_cmd tp"; exit 1;}
+[ -z "$addr" ] && { echo "no nvme_setup_cmd tp"; exit 1; }
 
 rmmod p2p_dev
 rmmod stub
