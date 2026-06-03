@@ -145,7 +145,7 @@ static void init_process_id(const struct va_desc *desc, struct devmm_svm_process
 {
     memset(process_id, 0, sizeof(*process_id));
     rcu_read_lock();
-    process_id->host_pid = pid_nr(find_vpid(desc->hostpid));
+    process_id->hostpid = pid_nr(find_vpid(desc->hostpid));
     rcu_read_unlock();
     process_id->devid = desc->devid;
     process_id->vfid = desc->vfid;
@@ -155,7 +155,7 @@ static void init_process_id_batch(const struct va_desc_ba *desc, struct devmm_sv
 {
     memset(process_id, 0, sizeof(*process_id));
     rcu_read_lock();
-    process_id->host_pid = pid_nr(find_vpid(desc->hostpid));
+    process_id->hostpid = pid_nr(find_vpid(desc->hostpid));
     rcu_read_unlock();
     process_id->devid = desc->devid;
     process_id->vfid = desc->vfid;
@@ -741,11 +741,11 @@ static int p2p_drain_read(struct p2p_batch *batch)
     if (!READ_ONCE(batch->io_cnt))
         return 0;
 
-    spin_lock(&batch_lock);
+    spin_lock(&batch->io_lock);
     list_splice_init(&batch->io_list, &tmp);
     total_cnt = batch->io_cnt;
     batch->io_cnt = 0;
-    spin_unlock(&batch_lock);
+    spin_unlock(&batch->io_lock);
 
     if (total_cnt == 0)
         return 0;
@@ -884,10 +884,10 @@ static int p2p_read_file_batch(struct p2p_batch *batch, void __user *arg)
 
     io_ctx->issue_err = do_read_ios_batch(io_ctx, extents, ext_num, addr_off, align_size);
     
-    spin_lock(&batch_lock);
+    spin_lock(&batch->io_lock);
     batch->io_cnt++;
     list_add_tail(&io_ctx->io_list, &batch->io_list);
-    spin_unlock(&batch_lock);
+    spin_unlock(&batch->io_lock);
 
 free_ext_out:
     kvfree(extents);
