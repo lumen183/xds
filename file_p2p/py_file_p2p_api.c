@@ -136,13 +136,12 @@ static PyObject *py_new_p2p_fd(PyObject *self, PyObject *Py_UNUSED(ignored))
 static PyObject *py_close_p2p_fd(PyObject *self, PyObject *args)
 {
     int dev_fd = 0;
-    int ret = 0;
 
     if (!PyArg_ParseTuple(args, "i", &dev_fd)) {
         return NULL;
     }
 
-    ret = close_p2p_fd(dev_fd);
+    close_p2p_fd(dev_fd);
 
     Py_RETURN_NONE;
 }
