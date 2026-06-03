@@ -50,6 +50,6 @@ struct paddr_desc {
 #define IOCTL_DUMP_PA _IOW('k', 1, struct va_desc)
 #define IOCTL_READ_FILE _IOWR('k', 2, struct read_desc)
 #define IOCTL_READ_FILE_BATCH _IOWR('k', 3, struct read_desc_ba)
-#define IOCTL_DRAIN_READ _IOWR('k', 4, 0)
+#define IOCTL_DRAIN_READ _IOC(_IOC_READ, 'k', 4, 0)
 
 #endif

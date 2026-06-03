@@ -65,7 +65,7 @@ struct p2p_batch {
 
 #define RQF_NVME_PT ((__force req_flags_t)(1 << 31))
 
-struct request *nvme_alloc_request(struct request_queue *q, struct nvme_command *cmd, blk_mq_req_flags flags, int qid);
+struct request *nvme_alloc_request(struct request_queue *q, struct nvme_command *cmd, blk_mq_req_flags_t flags, int qid);
 
 dev_t dev = 0;
 static struct class *dev_class;
@@ -419,7 +419,7 @@ static void hook_nvme_setup_cmd(void *ignore, struct request *rq, struct nvme_co
         return;
     }
 
-    cmd->rw.flags = NVME_CMD_SGL_NETABUF;
+    cmd->rw.flags = NVME_CMD_SGL_METABUF;
 }
 
 static int register_nvme_setup_cmd_hook(void)
@@ -678,7 +678,7 @@ static int p2p_read_file(struct p2p_batch *batch, void __user *arg)
         goto put_reg_file_out;
     }
     bdev_inode = bdev_file->f_mapping->host;
-    if (!IS_BLK(bdev_inode->i_mode)) {
+    if (!S_ISBLK(bdev_inode->i_mode)) {
         err = -EINVAL;
         goto put_bdev_file_out;
     }
@@ -851,7 +851,7 @@ static int p2p_read_file_batch(struct p2p_batch *batch, void __user *arg)
         goto put_reg_file_out;
     }
     bdev_inode = bdev_file->f_mapping->host;
-    if (!IS_BLK(bdev_inode->i_mode)) {
+    if (!S_ISBLK(bdev_inode->i_mode)) {
         err = -EINVAL;
         goto put_bdev_file_out;
     }
