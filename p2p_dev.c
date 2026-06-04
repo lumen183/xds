@@ -381,10 +381,10 @@ static struct p2p_io_context *new_io_ctx_batch(struct block_device *bdev, const 
        u64 *pa_list, unsigned int pa_num, unsigned int pa_size, unsigned int data_size)
 {
     struct p2p_io_context *io_ctx;
-
-    int count = round_up(data_size, HW_LIMIT_SIZE) / HW_LIMIT_SIZE * 10;
+    unsigned int limit = HW_LIMIT_SIZE;
+    int count = data_size / limit * 10;
     if (count < desc->desc.count) {
-        count = desc->desc.count;
+        count = desc->desc.count * 10;
     }
 
     io_ctx = kzalloc(sizeof(*io_ctx), GFP_KERNEL);
@@ -597,7 +597,7 @@ static int do_read_ios_batch(struct p2p_io_context *io_ctx, struct fiemap_extent
                 continue;
             }
 
-            err = do_read_io(io_ctx, sector, to_read, cur_pa(io_ctx));  
+            err = do_read_io(io_ctx, sector, to_read, cur_pa(io_ctx));
             if (err) {
                 goto out;
             }
@@ -712,10 +712,10 @@ static int p2p_read_file(struct p2p_batch *batch, void __user *arg)
 
     io_ctx->issue_err = do_read_ios(io_ctx, extents, ext_num);
     
-    spin_lock(&batch_lock);
+    spin_lock(&batch->io_lock);
     batch->io_cnt++;
     list_add_tail(&io_ctx->io_list, &batch->io_list);
-    spin_unlock(&batch_lock);
+    spin_unlock(&batch->io_lock);
 
 free_ext_out:
     kvfree(extents);
