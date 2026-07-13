@@ -208,7 +208,8 @@ static int get_pa_list(const struct va_desc *desc, u64 **_pa_list, unsigned int 
     size = desc->size;
     page_size = devmm_get_mem_page_size(&pid, addr, size);
     if (page_size <= 0) {
-        printk(KERN_ERR "Failed to get page size for addr %llx, size %llu\n", addr, size);
+        pr_err("p2p_dev: get page size failed hostpid=%d devid=%u vfid=%u addr=0x%llx size=%llu ret=%d\n",
+               pid.hostpid, pid.devid, pid.vfid, addr, size, page_size);
         if (!page_size) {
             page_size = -EINVAL;
         }
@@ -226,7 +227,8 @@ static int get_pa_list(const struct va_desc *desc, u64 **_pa_list, unsigned int 
 
     err = devmm_get_mem_pa_list(&pid, aligned_addr, aligned_size, pa_list, pa_num);
     if (err) {
-        printk(KERN_ERR "Failed to get PA list for addr %llx, size %llu, err %d\n", aligned_addr, aligned_size, err);
+        pr_err("p2p_dev: get PA list failed hostpid=%d devid=%u vfid=%u addr=0x%llx size=%llu pages=%u ret=%d\n",
+               pid.hostpid, pid.devid, pid.vfid, aligned_addr, aligned_size, pa_num, err);
         kvfree(pa_list);
         return err;
     }
@@ -260,7 +262,8 @@ static int get_pa_list_batch(const struct va_desc_ba *desc, u64 **_pa_list, unsi
     size = desc->size[0];
     page_size = devmm_get_mem_page_size(&pid, addr, size);
     if (page_size <= 0) {
-        printk(KERN_ERR "Failed to get page size for addr %llx, size %llu\n", addr, size);
+        pr_err("p2p_dev: batch get page size failed hostpid=%d devid=%u vfid=%u addr=0x%llx size=%llu ret=%d\n",
+               pid.hostpid, pid.devid, pid.vfid, addr, size, page_size);
         if (!page_size) {
             page_size = -EINVAL;
         }
@@ -297,7 +300,9 @@ static int get_pa_list_batch(const struct va_desc_ba *desc, u64 **_pa_list, unsi
 
         err = devmm_get_mem_pa_list(&pid, aligned_addr, aligned_size, pa_list + (pa_num - aligned_size / page_size), aligned_size / page_size);
         if (err) {
-            printk(KERN_ERR "Failed to get PA list for batch %d, err %d\n", i, err);
+            pr_err("p2p_dev: batch get PA list failed hostpid=%d devid=%u vfid=%u index=%d addr=0x%llx size=%llu pages=%llu ret=%d\n",
+                   pid.hostpid, pid.devid, pid.vfid, i, aligned_addr, aligned_size,
+                   (unsigned long long)(aligned_size / page_size), err);
             kvfree(pa_list);
             kvfree(addr_off);
             kvfree(ret_size);
@@ -706,26 +711,36 @@ static int p2p_read_file(struct p2p_batch *batch, void __user *arg)
         return -EFAULT;
     }
 
-    err = get_pa_list(&desc.desc, &pa_list, &pa_num, &pa_size);
-    if (err) {
-        return err;
+    addr_off = get_pa_list(&desc.desc, &pa_list, &pa_num, &pa_size);
+    if (addr_off < 0) {
+        pr_err("p2p_dev: READ_FILE rejected during PA query hostpid=%d devid=%u vfid=%u addr=0x%lx size=%lu ret=%d\n",
+               desc.desc.hostpid, desc.desc.devid, desc.desc.vfid,
+               desc.desc.addr, desc.desc.size, addr_off);
+        return addr_off;
     }
-    addr_off = err;
+    pr_info("p2p_dev: READ_FILE request hostpid=%d devid=%u vfid=%u addr=0x%lx size=%lu pa_num=%u pa_size=%u addr_off=%d file_fd=%d bdev_fd=%d ext_num=%u\n",
+            desc.desc.hostpid, desc.desc.devid, desc.desc.vfid,
+            desc.desc.addr, desc.desc.size, pa_num, pa_size, addr_off,
+            desc.file_fd, desc.bdev_fd, desc.ext_num);
 
     reg_file = fget(desc.file_fd);
     if (!reg_file) {
         err = -EBADF;
+        pr_err("p2p_dev: READ_FILE invalid file_fd=%d ret=%d\n", desc.file_fd, err);
         goto free_pa_out;
     }
 
     bdev_file = fget(desc.bdev_fd);
     if (!bdev_file) {
         err = -EBADF;
+        pr_err("p2p_dev: READ_FILE invalid bdev_fd=%d ret=%d\n", desc.bdev_fd, err);
         goto put_reg_file_out;
     }
     bdev_inode = bdev_file->f_mapping->host;
     if (!S_ISBLK(bdev_inode->i_mode)) {
         err = -EINVAL;
+        pr_err("p2p_dev: READ_FILE bdev_fd=%d is not a block device mode=0%o ret=%d\n",
+               desc.bdev_fd, bdev_inode->i_mode, err);
         goto put_bdev_file_out;
     }
     bdev = I_BDEV(bdev_inode);
@@ -738,12 +753,14 @@ static int p2p_read_file(struct p2p_batch *batch, void __user *arg)
     }
     if (copy_from_user(extents, user_desc->extents, ext_num * sizeof(*extents))) {
         err = -EFAULT;
+        pr_err("p2p_dev: READ_FILE extent copy failed ext_num=%u ret=%d\n", ext_num, err);
         goto free_ext_out;
     }
 
     data_size = calc_data_size(extents, ext_num);
     if (data_size > (unsigned long long)pa_size * pa_num) {
-        pr_err("data_size %llu > pa_size %u * pa_num %u\n", data_size, pa_size, pa_num);
+        pr_err("p2p_dev: READ_FILE data exceeds NPU buffer data_size=%llu pa_size=%u pa_num=%u ret=%d\n",
+               data_size, pa_size, pa_num, -E2BIG);
         err = -E2BIG;
         goto free_ext_out;
     }
@@ -757,6 +774,10 @@ static int p2p_read_file(struct p2p_batch *batch, void __user *arg)
     io_ctx->pa_offset = addr_off;
 
     io_ctx->issue_err = do_read_ios(io_ctx, extents, ext_num);
+    if (io_ctx->issue_err)
+        pr_err("p2p_dev: READ_FILE request issue failed hostpid=%d devid=%u vfid=%u ret=%d cmd_count=%d\n",
+               desc.desc.hostpid, desc.desc.devid, desc.desc.vfid,
+               io_ctx->issue_err, io_ctx->cmd_id);
     
     spin_lock(&batch->io_lock);
     batch->io_cnt++;

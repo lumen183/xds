@@ -163,7 +163,12 @@ to_read:
     err = ioctl(dev_fd, IOCTL_READ_FILE, read);
     if (err < 0) {
         err = -errno;
-        fprintf(stderr, "ioctl IOCTL_READ_FILE failed, errno: %d\n", -err);
+        fprintf(stderr,
+                "ioctl IOCTL_READ_FILE failed: errno=%d (%s) file=%s bdev=%s "
+                "offset=%lu addr=0x%lx size=%u devid=%u vfid=%u extents=%u\n",
+                -err, strerror(-err), param->file_name, param->bdev_name,
+                param->bdev_offset, param->addr, param->size,
+                param->devid, param->vfid, ext_num);
         goto free_read_out;
     }
 
@@ -285,7 +290,11 @@ int read_file_batch(int dev_fd, struct read_parameter *param, int param_num)
     err = ioctl(dev_fd, IOCTL_READ_FILE_BATCH, read);
     if (err < 0) {
         err = -errno;
-        fprintf(stderr, "ioctl IOCTL_READ_FILE_BATCH failed, errno: %d\n", -err);
+        fprintf(stderr,
+                "ioctl IOCTL_READ_FILE_BATCH failed: errno=%d (%s) file=%s bdev=%s "
+                "requests=%d extents=%u\n",
+                -err, strerror(-err), param[0].file_name, param[0].bdev_name,
+                param_num, ext_num);
         goto free_read_out;
     }
 
