@@ -16,11 +16,44 @@ Ascend 真机的快速 smoke 测试、性能测试和脚手架设计见
 
 ## 要求
 
-- Linux、Bash、CMake 3.16+；
-- Python mock 和 Python 扩展需要 CPython 3.8+；
-- `-X on` 还需要与运行内核匹配的 kernel headers。默认使用
+- Linux、Bash、CMake 3.16+、C 编译器和 GNU Make；
+- Python mock 和 Python 扩展需要 CPython 3.8+；构建 Python C 扩展还需要 Python
+  开发文件（通常为 `python3-devel` 或 `python3-dev`）；
+- `-X on` 还需要与运行内核完全匹配的内核开发文件，包括可用于外部模块构建的
+  `Makefile`、`.config` 和生成头文件。默认使用
   `/lib/modules/$(uname -r)/build`，也可通过 `KDIR` 指定；
 - 真机运行还需要可工作的 Ascend 驱动、匹配的 NVMe 设备与 root 权限。
+
+### 基础依赖安装
+
+以 openEuler/RHEL 系列为例，安装通用构建依赖：
+
+```bash
+sudo dnf install gcc make cmake bash python3 python3-devel
+```
+
+构建真实 Ascend 内核模块（`-X on`）时，还需要安装与当前运行内核版本匹配的
+内核开发包。常见安装方式为：
+
+```bash
+sudo dnf install kernel-devel-$(uname -r) kernel-headers-$(uname -r)
+```
+
+不同发行版的包名可能不同；关键是下面的目录必须存在，并且其中有内核构建
+`Makefile`：
+
+```bash
+ls -l /lib/modules/$(uname -r)/build/Makefile
+```
+
+如果内核源码或构建目录位于其他位置，可在构建时指定：
+
+```bash
+KDIR=/path/to/matching/kernel/build ./build.sh -X on -t build
+```
+
+仅构建 mock（`-X off`）不需要 Ascend 驱动、NVMe 设备、root 权限或 kernel headers；
+但执行 `-P` 或测试时仍需要 Python 开发文件。
 
 本机的 CMake 构建目录固定为 `build/`；内核模块输出为
 `build/kernel/p2p_dev/p2p_dev.ko` 和 `build/kernel/stub/stub.ko`，Python 模块输出为

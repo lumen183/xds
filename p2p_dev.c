@@ -482,7 +482,15 @@ static int do_read_io(struct p2p_io_context *io_ctx, unsigned long long sector, 
     req->end_io_data = io_ctx;
     atomic_inc(&io_ctx->io_ref);
     
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+    /*
+     * Since Linux 6.6, blk_execute_rq_nowait() takes only the request and
+     * the queue-head flag.  The completion callback is carried by the
+     * request itself.
+     */
+    req->end_io = end_read_io;
+    blk_execute_rq_nowait(req, true);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
     blk_execute_rq_nowait(disk, req, true, end_read_io);
 #else
     blk_execute_rq_nowait(queue, disk, req, true, end_read_io);
@@ -964,7 +972,11 @@ static int __init p2p_drv_init(void)
         goto free_dev;
     }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
+    dev_class = class_create("p2p_class");
+#else
     dev_class = class_create(THIS_MODULE, "p2p_class");
+#endif
     if (IS_ERR(dev_class)) {
         err = PTR_ERR(dev_class);
         pr_err("p2p Driver: Cannot create the struct class\n");
