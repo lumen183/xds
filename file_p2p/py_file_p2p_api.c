@@ -2,6 +2,7 @@
 #include <Python.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include "file_p2p_api.h"
 
@@ -171,18 +172,14 @@ static PyMethodDef FileP2PMethods[] = {
         "read_file_batch",
         py_read_file_batch,
         METH_VARARGS,
-        "read_file_batch(dev_fd, file_name, bdev_name, bdev_offset, addr, size, devid, vfid) -> int\n\n"
+        "read_file_batch(dev_fd, file_name, bdev_name, requests) -> int\n\n"
         "Read file batch from p2p device.\n"
         "\n"
         "Parameters:\n"
         "    dev_fd (int): File descriptor of p2p device.\n"
         "    file_name (str): Name of file to read.\n"
         "    bdev_name (str): Name of block device to read.\n"
-        "    bdev_offset (int): Offset in block device to read.\n"
-        "    addr (int): Address in host memory to read.\n"
-        "    size (int): Size in bytes to read.\n"
-        "    devid (int): Device ID.\n"
-        "    vfid (int): Virtual function ID.\n"
+        "    requests (list): Entries of (bdev_offset, addr, size).\n"
         "\n"
         "Returns:\n"
         "    int: 0 on success, non-zero on error.\n"

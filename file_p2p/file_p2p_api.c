@@ -127,7 +127,6 @@ int read_file(int dev_fd, struct read_parameter *param)
     
     for (i = 0; i < ext_num; i++) {
         if (total_size + exts->fm_extents[i].fe_length > param->size) {
-            printf("noooo %ld %ld\n", total_size, exts->fm_extents[i].fe_length);
             exts->fm_extents[i].fe_length = param->size - total_size;
             total_size += exts->fm_extents[i].fe_length;
             ext_num = i + 1;
@@ -138,7 +137,7 @@ int read_file(int dev_fd, struct read_parameter *param)
 
     if (total_size > param->size) {
         err = -EINVAL;
-        fprintf(stderr, "total_size %ld > param->size %ld\n", total_size, param->size);
+        fprintf(stderr, "total_size %lu > param->size %u\n", total_size, param->size);
         goto free_ext_out;
     }
 
@@ -240,8 +239,6 @@ int read_file_batch(int dev_fd, struct read_parameter *param, int param_num)
     
     for (i = 0; i < ext_num; i++) {
         if (total_size + exts->fm_extents[i].fe_length > max_size) {
-            printf("noooo %ld %ld\n", total_size, exts->fm_extents[i].fe_length);
-            fflush(stdout);
             exts->fm_extents[i].fe_length = max_size - total_size;
             total_size += exts->fm_extents[i].fe_length;
             ext_num = i + 1;
