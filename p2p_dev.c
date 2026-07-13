@@ -430,7 +430,15 @@ static int register_nvme_setup_cmd_hook(void)
     return tracepoint_probe_register(tp_nvme_setup_cmd, hook_nvme_setup_cmd, NULL);
 }
 
-static void end_read_io(struct request *req, blk_status_t status)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+#define P2P_END_IO_RET enum rq_end_io_ret
+#define P2P_END_IO_RETURN() return RQ_END_IO_NONE
+#else
+#define P2P_END_IO_RET void
+#define P2P_END_IO_RETURN()
+#endif
+
+static P2P_END_IO_RET end_read_io(struct request *req, blk_status_t status)
 {
     struct p2p_io_context *io_ctx = req->end_io_data;
     if (status)
@@ -439,10 +447,11 @@ static void end_read_io(struct request *req, blk_status_t status)
     blk_mq_free_request(req);
     io_ctx->end_time = ktime_get_ns();
     if (!atomic_dec_and_test(&io_ctx->io_ref)) {
-        return;
+        P2P_END_IO_RETURN();
     }
 
     complete(&io_ctx->io_done);
+    P2P_END_IO_RETURN();
 }
 
 #define THRESH_NS (1000000UL)
