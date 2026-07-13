@@ -376,6 +376,7 @@ bench 参数：
 --iterations N           正式迭代次数，默认 20 或由实现设定
 --verify / --no-verify   默认校验；显式关闭校验
 --json PATH              保存详细 JSON
+--verbose                为 bench 也输出阶段日志；smoke 默认输出阶段日志
 ```
 
 ## 11. 故障排查

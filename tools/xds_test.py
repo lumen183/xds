@@ -21,6 +21,15 @@ class TestFailure(RuntimeError):
     pass
 
 
+def log(args, phase, message):
+    """Emit phase logs for smoke, or for any command explicitly made verbose."""
+    if args.command != "smoke" and not getattr(args, "verbose", False):
+        return
+    started = getattr(args, "log_started", time.monotonic())
+    elapsed = time.monotonic() - started
+    print(f"INFO phase={phase} elapsed={elapsed:.3f}s {message}", file=sys.stderr, flush=True)
+
+
 def parse_size(value):
     suffixes = {"": 1, "k": 1024, "m": 1024**2, "g": 1024**3, "t": 1024**4}
     text = value.strip().lower()
@@ -63,7 +72,7 @@ def write_pattern(fd, size):
             position += written
 
 
-def fiemap_check(path, offset, length):
+def fiemap_check(path, offset, length, args):
     """Verify requested bytes have allocated, written FIEMAP extents."""
     # fiemap (32 bytes) + 256 fiemap_extent records (56 bytes).
     buffer = bytearray(32 + 256 * 56)
@@ -77,6 +86,7 @@ def fiemap_check(path, offset, length):
     finally:
         os.close(fd)
     _, _, _, mapped, _, _ = struct.unpack_from("=QQIIII", buffer, 0)
+    log(args, "fiemap", f"path={path} offset={offset} length={length} mapped_extents={mapped}")
     if not mapped:
         raise TestFailure("FIEMAP returned no extents; the file may be sparse")
     cursor = offset
@@ -91,7 +101,8 @@ def fiemap_check(path, offset, length):
     raise TestFailure("FIEMAP extents do not cover requested read range")
 
 
-def check_bdev(path, bdev):
+def check_bdev(path, bdev, args):
+    log(args, "bdev.check", f"file={path} requested_bdev={bdev}")
     if not stat.S_ISBLK(os.stat(bdev).st_mode):
         raise TestFailure(f"--bdev is not a block device: {bdev}")
     found = subprocess.run(["findmnt", "-n", "-o", "SOURCE", "--target", path], text=True, capture_output=True)
@@ -99,6 +110,7 @@ def check_bdev(path, bdev):
         raise TestFailure(f"cannot determine filesystem backing {path}; it must be local to {bdev}")
     source = os.path.realpath(found.stdout.strip())
     target = os.path.realpath(bdev)
+    log(args, "bdev.check", f"filesystem_source={source} requested_source={target}")
     if source == target:
         return
     parent = subprocess.run(["lsblk", "-no", "PKNAME", source], text=True, capture_output=True)
@@ -111,6 +123,7 @@ class InputFile:
     def __init__(self, args, required_size):
         self.path = None
         self.generated = False
+        log(args, "input.prepare", f"required_size={required_size} data_dir={args.data_dir!r} file={args.file!r}")
         if args.file:
             self.path = Path(args.file).resolve()
             if not self.path.is_file():
@@ -121,18 +134,22 @@ class InputFile:
                 raise TestFailure(f"--data-dir is not a directory: {directory}")
             fd, name = tempfile.mkstemp(prefix="xds-test-", suffix=".bin", dir=directory)
             self.path, self.generated = Path(name), True
+            log(args, "input.write", f"path={self.path} bytes={required_size}")
             try:
                 write_pattern(fd, required_size)
+                log(args, "input.fsync", f"path={self.path}")
                 os.fsync(fd)
             finally:
                 os.close(fd)
         if self.path.stat().st_size < required_size:
             raise TestFailure(f"file is too small: need {required_size} bytes, got {self.path.stat().st_size}")
         allocated = self.path.stat().st_blocks * 512
+        log(args, "input.ready", f"path={self.path} size={self.path.stat().st_size} allocated={allocated}")
         if allocated < required_size:
             raise TestFailure("test file is sparse; use a filesystem with allocated local extents")
-        fiemap_check(str(self.path), args.offset, required_size - args.offset)
-        check_bdev(str(self.path), args.bdev)
+        fiemap_check(str(self.path), args.offset, required_size - args.offset, args)
+        check_bdev(str(self.path), args.bdev, args)
+        log(args, "input.checked", f"path={self.path}")
 
     def close(self):
         if self.generated and self.path:
@@ -143,15 +160,25 @@ class InputFile:
 
 
 def require_runtime(args):
+    log(args, "runtime.device", "checking /dev/p2p_device access")
     if not os.access("/dev/p2p_device", os.R_OK | os.W_OK):
         raise TestFailure("/dev/p2p_device is unavailable; run ./tools/xds.sh setup first")
     try:
+        log(args, "runtime.import", "importing torch")
         import torch
+        log(args, "runtime.import", f"torch imported version={getattr(torch, '__version__', 'unknown')}")
+        log(args, "runtime.import", "importing torch_npu")
         import torch_npu  # noqa: F401
+        log(args, "runtime.import", "torch_npu imported")
+        log(args, "runtime.import", "importing file_p2p")
         import file_p2p
+        log(args, "runtime.import", "file_p2p imported")
     except ImportError as exc:
         raise TestFailure(f"runtime import failed: {exc}") from exc
-    if not hasattr(torch, "npu") or args.devid >= torch.npu.device_count():
+    log(args, "runtime.npu", "querying NPU device count")
+    device_count = torch.npu.device_count() if hasattr(torch, "npu") else 0
+    log(args, "runtime.npu", f"device_count={device_count} requested_devid={args.devid} requested_vfid={args.vfid}")
+    if not hasattr(torch, "npu") or args.devid >= device_count:
         raise TestFailure(f"invalid NPU device id: {args.devid}")
     return torch, file_p2p
 
@@ -173,35 +200,51 @@ def verify(torch, buf, offset, size):
     raise TestFailure("data verification failed: returned buffer length differs")
 
 
-def submit(file_p2p, fd, args, addr, request_count):
+def submit(file_p2p, fd, args, addr, request_count, label):
+    log(args, "io.submit", f"begin label={label} api={args.api} requests={request_count} size={args.size} addr=0x{addr:x}")
     if args.api == "batch":
         requests = [(args.offset + i * args.size, addr + i * args.size, args.size) for i in range(request_count)]
         check_result("read_file_batch", file_p2p.read_file_batch(fd, str(args.input.path), args.bdev, requests, args.devid, args.vfid))
     else:
         for i in range(request_count):
             check_result("read_file", file_p2p.read_file(fd, str(args.input.path), args.bdev, args.offset + i * args.size, addr + i * args.size, args.size, args.devid, args.vfid))
+    log(args, "io.submit", f"queued label={label}")
+    log(args, "io.drain", f"begin label={label}; waiting for kernel/NVMe completions")
     check_result("drain_read", file_p2p.drain_read(fd))
+    log(args, "io.drain", f"complete label={label}")
 
 
 def run(args):
+    log(args, "run.start", f"command={args.command} api={args.api} bdev={args.bdev} size={args.size} offset={args.offset} devid={args.devid} vfid={args.vfid}")
     torch, file_p2p = require_runtime(args)
     request_count = args.batch_size if args.api == "batch" else args.inflight
     required_size = args.offset + args.size * request_count
     args.input = InputFile(args, required_size)
     fd = None
     try:
-        buf = torch.empty(args.size * request_count, dtype=torch.uint8, device=torch.device(f"npu:{args.devid}"))
+        device_name = f"npu:{args.devid}"
+        log(args, "npu.alloc", f"begin device={device_name} bytes={args.size * request_count}")
+        buf = torch.empty(args.size * request_count, dtype=torch.uint8, device=torch.device(device_name))
+        log(args, "npu.alloc", f"complete device={device_name} addr=0x{buf.data_ptr():x}")
+        log(args, "p2p.open", "opening /dev/p2p_device")
         fd = file_p2p.new_p2p_fd()
         check_result("new_p2p_fd", fd)
+        log(args, "p2p.open", f"complete fd={fd}")
         for _ in range(args.warmup):
-            submit(file_p2p, fd, args, buf.data_ptr(), request_count)
+            submit(file_p2p, fd, args, buf.data_ptr(), request_count, f"warmup-{_ + 1}/{args.warmup}")
         elapsed = []
-        for _ in range(args.iterations):
+        for iteration in range(args.iterations):
+            log(args, "iteration", f"begin {iteration + 1}/{args.iterations}")
             start = time.perf_counter_ns()
-            submit(file_p2p, fd, args, buf.data_ptr(), request_count)
+            submit(file_p2p, fd, args, buf.data_ptr(), request_count, f"iteration-{iteration + 1}/{args.iterations}")
             elapsed.append(time.perf_counter_ns() - start)
+            log(args, "iteration", f"complete {iteration + 1}/{args.iterations} elapsed_ns={elapsed[-1]}")
+        log(args, "npu.sync", "begin torch.npu.synchronize()")
         torch.npu.synchronize()
+        log(args, "npu.sync", "complete")
+        log(args, "verify", f"begin bytes={args.size * request_count}")
         verification = verify(torch, buf, args.offset, args.size * request_count) if args.verify else {"enabled": False, "status": "skipped"}
+        log(args, "verify", f"complete status={verification['status']}")
         total = sum(elapsed)
         byte_count = args.size * request_count * args.iterations
         result = {"status": "PASS", "api": args.api, "bdev": args.bdev, "file": str(args.input.path), "devid": args.devid, "vfid": args.vfid, "size": args.size, "inflight": args.inflight, "warmup": args.warmup, "iterations": args.iterations, "bytes": byte_count, "elapsed_ns": total, "bandwidth_bytes_per_sec": byte_count * 1_000_000_000 / total if total else 0, "latency_ns": {"p50": percentile(elapsed, .50), "p95": percentile(elapsed, .95), "p99": percentile(elapsed, .99)}, "verify": verification}
@@ -210,8 +253,11 @@ def run(args):
         return result
     finally:
         if fd is not None:
+            log(args, "p2p.close", f"closing fd={fd}")
             file_p2p.close_p2p_fd(fd)
+        log(args, "input.cleanup", f"removing generated input={args.input.path}")
         args.input.close()
+        log(args, "run.end", "resources released")
 
 
 def parser():
@@ -224,6 +270,7 @@ def parser():
     common.add_argument("--offset", type=int, default=0)
     common.add_argument("--devid", type=int, default=0)
     common.add_argument("--vfid", type=int, default=0)
+    common.add_argument("--verbose", action="store_true", help="emit phase logs (smoke logs by default)")
     root = argparse.ArgumentParser(description=__doc__)
     commands = root.add_subparsers(dest="command", required=True)
     smoke = commands.add_parser("smoke", parents=[common])
@@ -242,6 +289,7 @@ def parser():
 
 def main():
     args = parser().parse_args()
+    args.log_started = time.monotonic()
     try:
         if args.offset < 0 or args.devid < 0 or args.vfid < 0 or args.inflight < 1 or args.batch_size < 1 or args.warmup < 0 or args.iterations < 1:
             raise TestFailure("offset, device ids, batch/inflight, warmup and iterations are out of range")

@@ -13,6 +13,11 @@ MODULE_SIGN_HASH="${MODULE_SIGN_HASH:-sha256}"
 
 die() { echo "xds.sh: $*" >&2; exit 1; }
 
+script_log() {
+    [[ "${XDS_COMMAND:-}" == "smoke" || "${XDS_VERBOSE:-0}" == 1 ]] || return 0
+    echo "INFO phase=$1 $2" >&2
+}
+
 sign_module() {
     # A signature is useful only when its certificate is trusted by the host
     # kernel. Therefore signing is opt-in and the key is supplied by the user.
@@ -51,6 +56,7 @@ EOF
 
 source_cann() {
     local env_file="${CANN_ENV:-}"
+    script_log "cann.source" "begin env=${env_file:-auto}"
     if [[ -z "$env_file" ]]; then
         for env_file in /usr/local/Ascend/ascend-toolkit/set_env.sh /usr/local/Ascend/ascend-toolkit/latest/set_env.sh; do
             [[ -f "$env_file" ]] && break
@@ -59,6 +65,7 @@ source_cann() {
     [[ -n "$env_file" && -f "$env_file" ]] || die "CANN environment is unavailable; set CANN_ENV=/path/to/set_env.sh"
     # shellcheck disable=SC1090
     source "$env_file"
+    script_log "cann.source" "complete env=$env_file"
 }
 
 setup() {
@@ -121,14 +128,21 @@ cleanup() {
 main() {
     (($# >= 1)) || { usage; exit 2; }
     local command="$1"; shift
+    XDS_COMMAND="$command"
+    XDS_VERBOSE=0
+    for arg in "$@"; do
+        [[ "$arg" == "--verbose" ]] && XDS_VERBOSE=1
+    done
     case "$command" in
         setup) (($# == 0)) || die "setup takes no arguments"; setup ;;
         smoke|bench)
             if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
                 exec "$PYTHON" "${ROOT_DIR}/tools/xds_test.py" "$command" "$@"
             fi
+            script_log "launcher" "begin command=$command python=$PYTHON"
             source_cann
             export PYTHONPATH="${ROOT_DIR}/build/python${PYTHONPATH:+:$PYTHONPATH}"
+            script_log "launcher" "exec test_runner=${ROOT_DIR}/tools/xds_test.py"
             exec "$PYTHON" "${ROOT_DIR}/tools/xds_test.py" "$command" "$@"
             ;;
         cleanup) (($# == 0)) || die "cleanup takes no arguments"; cleanup ;;
