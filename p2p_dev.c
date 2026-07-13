@@ -66,7 +66,18 @@ struct p2p_batch {
 
 #define RQF_NVME_PT ((__force req_flags_t)(1 << 31))
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+/*
+ * nvme_alloc_request() was removed from the upstream NVMe host driver.
+ * Linux 6.6 allocates passthrough requests directly from blk-mq and then
+ * initializes the NVMe private request state with nvme_init_request().
+ * The prototype lives in the NVMe driver's private header, so keep the
+ * declaration here for an external module.
+ */
+void nvme_init_request(struct request *req, struct nvme_command *cmd);
+#else
 struct request *nvme_alloc_request(struct request_queue *q, struct nvme_command *cmd, blk_mq_req_flags_t flags, int qid);
+#endif
 
 dev_t dev = 0;
 static struct class *dev_class;
@@ -481,7 +492,20 @@ static int do_read_io(struct p2p_io_context *io_ctx, unsigned long long sector, 
     cmd->rw.dptr.sgl.type = NVME_SGL_FMT_DATA_DESC << 4;
     io_ctx->cmd_id++;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+    /*
+     * nvme_alloc_request() no longer exists on 6.6.  This request is an
+     * ordinary NVMe I/O passthrough request; qid == -1 in the old call means
+     * that blk-mq may choose the hardware queue.
+     */
+    req = blk_mq_alloc_request(queue,
+            cmd->rw.opcode == nvme_cmd_write ? REQ_OP_DRV_OUT : REQ_OP_DRV_IN,
+            0);
+    if (!IS_ERR(req))
+        nvme_init_request(req, cmd);
+#else
     req = nvme_alloc_request(queue, cmd, 0, -1);
+#endif
     if (IS_ERR(req)) {
         pr_err("Failed to alloc request\n");
         return -ENOMEM;
