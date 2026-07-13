@@ -72,9 +72,10 @@ def read_file(dev_fd: int, file_name: str, bdev_name: str, bdev_offset: int,
     return _queue_read(dev_fd, file_name, bdev_offset, addr, size)
 
 
-def read_file_batch(dev_fd: int, file_name: str, bdev_name: str, requests) -> int:
+def read_file_batch(dev_fd: int, file_name: str, bdev_name: str, requests,
+                    devid: int = 0, vfid: int = 0) -> int:
     """Queue a batch of ``(bdev_offset, addr, size)`` requests."""
-    del bdev_name
+    del bdev_name, devid, vfid
     if not _valid_fd(dev_fd):
         return -errno.EBADF
     if not isinstance(requests, (list, tuple)) or not requests:

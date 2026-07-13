@@ -49,25 +49,26 @@ static PyObject *py_read_file_batch(PyObject *self, PyObject *args)
     PyObject *py_list = NULL;
     int ret = 0;
 
-    if (!PyArg_ParseTuple(args, "issO", &dev_fd, &file_name, &bdev_name, &py_list)) {
-        return PyLong_FromLong((long)-1);
+    if (!PyArg_ParseTuple(args, "issO|HH", &dev_fd, &file_name, &bdev_name,
+                          &py_list, &devid, &vfid)) {
+        return NULL;
     }
 
     if (!PyList_Check(py_list)) {
         PyErr_SetString(PyExc_TypeError, "third arg must be a list");
-        return PyLong_FromLong((long)-1);
+        return NULL;
     }
 
     Py_ssize_t n = PyList_Size(py_list);
     if (n == 0) {
         PyErr_SetString(PyExc_TypeError, "third arg must be a non-empty list");
-        return PyLong_FromLong((long)-1);
+        return NULL;
     }
 
     struct read_parameter *params = malloc(n * sizeof(struct read_parameter));
     if (params == NULL) {
         PyErr_SetString(PyExc_MemoryError, "malloc read_parameter failed");
-        return PyLong_FromLong((long)-1);
+        return NULL;
     }
 
     for (Py_ssize_t i = 0; i < n; i++) {
@@ -75,7 +76,7 @@ static PyObject *py_read_file_batch(PyObject *self, PyObject *args)
         if (!PyTuple_Check(py_item) && !PyList_Check(py_item)) {
             PyErr_SetString(PyExc_TypeError, "third arg must be a list/tuple of at least 3 elements (bdev_offset, addr, size)");
             free(params);
-            return PyLong_FromLong((long)-1);
+            return NULL;
         }
 
         PyObject *seq = PySequence_Fast(py_item, "entry must be a sequence");
@@ -89,7 +90,7 @@ static PyObject *py_read_file_batch(PyObject *self, PyObject *args)
             Py_DECREF(seq);
             PyErr_SetString(PyExc_TypeError, "entry must be a sequence of at least 3 elements (bdev_offset, addr, size)");
             free(params);
-            return PyLong_FromLong((long)-1);
+            return NULL;
         }
 
         PyObject **items = PySequence_Fast_ITEMS(seq);
@@ -172,7 +173,7 @@ static PyMethodDef FileP2PMethods[] = {
         "read_file_batch",
         py_read_file_batch,
         METH_VARARGS,
-        "read_file_batch(dev_fd, file_name, bdev_name, requests) -> int\n\n"
+        "read_file_batch(dev_fd, file_name, bdev_name, requests, devid=0, vfid=0) -> int\n\n"
         "Read file batch from p2p device.\n"
         "\n"
         "Parameters:\n"
@@ -180,6 +181,8 @@ static PyMethodDef FileP2PMethods[] = {
         "    file_name (str): Name of file to read.\n"
         "    bdev_name (str): Name of block device to read.\n"
         "    requests (list): Entries of (bdev_offset, addr, size).\n"
+        "    devid (int): Device ID (optional, defaults to 0).\n"
+        "    vfid (int): Virtual function ID (optional, defaults to 0).\n"
         "\n"
         "Returns:\n"
         "    int: 0 on success, non-zero on error.\n"
