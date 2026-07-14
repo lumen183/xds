@@ -148,15 +148,24 @@ def verify_samples(torch, file_p2p, fd, args, request_size):
             first = next((index for index, (got, want) in enumerate(zip(actual, wanted)) if got != want), None)
             if first is None:
                 first = min(len(actual), len(wanted))
+            mismatch_count = sum(got != want for got, want in zip(actual, wanted))
             window_start = max(0, first - 8)
             window_end = min(sample_size, first + 8)
-            log(
-                args,
-                "verify.mismatch",
-                f"sample_offset={offset} first_index={first} first_file_offset={offset + first} "
-                f"actual={actual[window_start:window_end].hex()} expected={wanted[window_start:window_end].hex()} "
-                f"window=[{window_start},{window_end})",
+            diagnostic = (
+                f"data verification failed: sample_offset={offset} sample_size={sample_size} "
+                f"request_size={request_size} first_index={first} first_file_offset={offset + first} "
+                f"device_address=0x{address + first:x} mismatch_count={mismatch_count} "
+                f"window=[{window_start},{window_end}) "
+                f"actual_window=0x{actual[window_start:window_end].hex()} "
+                f"expected_window=0x{wanted[window_start:window_end].hex()} "
+                f"actual_head=0x{actual[:32].hex()} expected_head=0x{wanted[:32].hex()} "
+                f"actual_tail=0x{actual[-32:].hex()} expected_tail=0x{wanted[-32:].hex()}"
             )
+            # Keep this visible even without --verbose: the old verify() error
+            # only exposed the first differing byte and hid whether the whole
+            # sample was stale, zero-filled, shifted, or partially transferred.
+            print(f"DEBUG phase=verify.mismatch {diagnostic}", file=sys.stderr, flush=True)
+            raise TestFailure(diagnostic)
         else:
             log(
                 args,
