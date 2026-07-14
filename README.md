@@ -302,6 +302,36 @@ done
 远大于设备缓存的已验证文件中选择新范围，并在 JSON 记录工作集大小、stride、随机种子和
 是否绕过缓存。该模式应在完成上述驱动正确性修复后实现。
 
+### 单 NPU 顺序大文件扫描
+
+`tools/single_npu_stream_bench.py` 用于单张 NPU 的顺序大文件扫描。它只使用稳定的
+`read_file()`/`drain_read()` 路径：创建一个临时文件后，按每个 `size × io-depth` 组合从
+头到尾读完整个文件。组合之间复用同一个文件；不会为每组重新生成文件。
+
+先准备 CANN 环境和真实 P2P 设备：
+
+```bash
+source /usr/local/Ascend/ascend-toolkit/latest/set_env.sh
+./tools/xds.sh setup
+python3 tools/single_npu_stream_bench.py \
+  --bdev /dev/nvme0n1 --data-dir /mnt/nvme \
+  --file-size 3G --size 32K,64K,128K --io-depth 4,8,16,32 \
+  --json stream-results.json
+```
+
+`--file-size` 默认 `3G`，并指定一次扫描读取的总字节数；`--size` 是每个 P2P 请求的
+粒度，`--io-depth` 是每次 `drain_read()` 前连续提交的请求数。两项都支持一个值或逗号
+分隔的多个值。默认扫描：
+
+```text
+--size     32K,64K,128K,256K,512K,1M
+--io-depth 4,8,16,32,64,128
+```
+
+默认会在每组扫描之后额外验证文件的首、中、尾三个样本；验证不计入带宽计时。使用
+`--no-verify` 可关闭它以只测性能。临时文件在脚本退出时删除；因此 `--data-dir` 必须位于
+`--bdev` 对应的本地文件系统，并有至少 `--file-size` 的可用空间。
+
 ## 磁盘、文件系统与 FIEMAP
 
 ### 查看设备能力
