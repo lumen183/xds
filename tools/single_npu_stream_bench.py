@@ -193,6 +193,28 @@ def verify_samples(torch, file_p2p, fd, args, request_size):
     return {"enabled": True, "status": "ok", "samples": len(offsets), "sample_size": sample_size}
 
 
+def log_host_file_samples(args):
+    """Check the ordinary host read path before testing P2P/DMA."""
+    sample_size = min(args.file_size, 64)
+    tail_offset = args.offset + args.file_size - sample_size
+    fd = os.open(args.input.path, os.O_RDONLY)
+    try:
+        head = os.pread(fd, sample_size, args.offset)
+        tail = os.pread(fd, sample_size, tail_offset)
+    finally:
+        os.close(fd)
+    expected_head = expected(args.offset, sample_size)
+    expected_tail = expected(tail_offset, sample_size)
+    log(
+        args,
+        "input.sample",
+        f"path={args.input.path} offset={args.offset} length={sample_size} "
+        f"head_match={head == expected_head} tail_offset={tail_offset} tail_match={tail == expected_tail} "
+        f"head=0x{head.hex()} expected_head=0x{expected_head.hex()} "
+        f"tail=0x{tail.hex()} expected_tail=0x{expected_tail.hex()}",
+    )
+
+
 def _gib(value):
     return f"{value / 1024 ** 3:.2f}"
 
@@ -329,6 +351,7 @@ def run(args):
     )
     torch, file_p2p = require_runtime(args)
     args.input = InputFile(args, args.offset + args.file_size)
+    log_host_file_samples(args)
     fd = None
     try:
         fd = file_p2p.new_p2p_fd()
