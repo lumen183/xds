@@ -127,8 +127,24 @@ def sample_offsets(offset, length, request_size):
 def verify_samples(torch, file_p2p, fd, args, request_size):
     """Verify three representative locations outside the measured stream pass."""
     sample_size, offsets = sample_offsets(args.offset, args.file_size, request_size)
-    buffer = torch.empty(sample_size, dtype=torch.uint8, device=torch.device(f"npu:{args.devid}"))
+    # The P2P driver builds NVMe SGLs from the NPU virtual address.  Use a
+    # page-aligned sub-buffer here so verification does not accidentally test
+    # the driver's handling of an address such as 0x...0200 instead of the
+    # actual read path.
+    raw_buffer = torch.empty(sample_size + 4095, dtype=torch.uint8, device=torch.device(f"npu:{args.devid}"))
+    raw_address = raw_buffer.data_ptr()
+    aligned_offset = (-raw_address) & 0xFFF
+    buffer = raw_buffer[aligned_offset:aligned_offset + sample_size]
     address = buffer.data_ptr()
+    log(
+        args,
+        "verify.alloc",
+        f"sample_size={sample_size} raw_address=0x{raw_address:x} "
+        f"aligned_offset={aligned_offset} aligned_address=0x{address:x} "
+        f"alignment={address & 0xFFF}",
+    )
+    if address & 0xFFF:
+        raise TestFailure(f"failed to create 4KiB-aligned verification buffer: address=0x{address:x}")
     for offset in offsets:
         log(
             args,
