@@ -801,6 +801,7 @@ static int p2p_drain_read(struct p2p_batch *batch)
     unsigned int total_cnt;
     unsigned int got_cnt;
     unsigned int err_cnt;
+    int first_err = 0;
     LIST_HEAD(tmp);
 
     if (!READ_ONCE(batch->io_cnt))
@@ -826,13 +827,18 @@ static int p2p_drain_read(struct p2p_batch *batch)
         
         if (io_err && !err) {
             pr_err("got io err %d %d %d\n", io_err, blk_status_to_errno(io_err), io_ctx->nsid);
-            err = io_err;
+            /* Return a negative errno to the userspace wrapper, rather than
+             * the positive blk_status_t enum value. */
+            err = blk_status_to_errno(io_err);
         }
 
         if (!err)
             dump_pa_content(io_ctx->pa_list[0], min_t(unsigned int, io_ctx->data_size, io_ctx->pa_size));
-        else
+        else {
             err_cnt++;
+            if (!first_err)
+                first_err = err;
+        }
 
         if (io_ctx->cmd_id != 0) {
             g_time += (io_ctx->end_time - io_ctx->start_time);
@@ -856,7 +862,7 @@ static int p2p_drain_read(struct p2p_batch *batch)
         g_size = 0;
         g_count = 0;
     }
-    return 0;
+    return first_err;
 }
 
 static int p2p_read_file_batch(struct p2p_batch *batch, void __user *arg)
