@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 FS_IOC_FIEMAP = 0xC020660B
+FIEMAP_FLAG_SYNC = 0x00000001
 FIEMAP_EXTENT_UNWRITTEN = 0x00000800
 _MIB = 1024 * 1024
 _FIEMAP_HEADER_SIZE = 32
@@ -89,7 +90,10 @@ def fiemap_check(path, offset, length, args):
             # FIEMAP returns at most fm_extent_count records.  A full result is
             # not an error: query again from the byte just covered.
             buffer = bytearray(_FIEMAP_HEADER_SIZE + _FIEMAP_EXTENTS_PER_QUERY * _FIEMAP_EXTENT_SIZE)
-            struct.pack_into("=QQIIII", buffer, 0, cursor, end - cursor, 0, 0, _FIEMAP_EXTENTS_PER_QUERY, 0)
+            # Ask the filesystem to flush pending extent conversion before
+            # examining it.  Without FIEMAP_FLAG_SYNC, ext4/XFS can report
+            # freshly written extents as UNWRITTEN despite the preceding fsync.
+            struct.pack_into("=QQIIII", buffer, 0, cursor, end - cursor, FIEMAP_FLAG_SYNC, 0, _FIEMAP_EXTENTS_PER_QUERY, 0)
             fcntl.ioctl(fd, FS_IOC_FIEMAP, buffer, True)
             _, _, _, mapped, _, _ = struct.unpack_from("=QQIIII", buffer, 0)
             total_mapped += mapped
@@ -101,7 +105,11 @@ def fiemap_check(path, offset, length, args):
             for index in range(mapped):
                 logical, _physical, extent_length, _r1, _r2, flags, *_ = struct.unpack_from(
                     "=QQQQQIIII", buffer, _FIEMAP_HEADER_SIZE + index * _FIEMAP_EXTENT_SIZE)
-                if flags & FIEMAP_EXTENT_UNWRITTEN or logical > cursor:
+                # Compare with the end of the preceding extent, not the
+                # original query cursor.  A fragmented but contiguous file
+                # legitimately has later extents whose logical offset is
+                # greater than ``cursor``.
+                if flags & FIEMAP_EXTENT_UNWRITTEN or logical > next_cursor:
                     raise TestFailure("FIEMAP shows an unwritten or sparse extent")
                 next_cursor = max(next_cursor, logical + extent_length)
                 if next_cursor >= end:
