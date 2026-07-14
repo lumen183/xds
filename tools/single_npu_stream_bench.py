@@ -117,6 +117,114 @@ def verify_samples(torch, file_p2p, fd, args, request_size):
     return {"enabled": True, "status": "ok", "samples": len(offsets), "sample_size": sample_size}
 
 
+def report_html(payload):
+    """Render a self-contained, offline HTML report for a completed scan."""
+    data = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XDS single-NPU stream benchmark</title>
+<style>
+  :root {{ color-scheme: dark; font-family: system-ui, sans-serif; background: #10151f; color: #e8edf7; }}
+  body {{ max-width: 1280px; margin: 0 auto; padding: 28px; }}
+  h1 {{ margin: 0 0 6px; }} .muted {{ color: #aab7ce; }}
+  .cards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 22px 0; }}
+  .card, .panel {{ background: #182131; border: 1px solid #2b3a53; border-radius: 10px; padding: 16px; }}
+  .card strong {{ display: block; font-size: 1.35rem; margin-top: 5px; }}
+  .panels {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 16px; }}
+  .panel {{ overflow-x: auto; }} svg {{ min-width: 480px; display: block; }}
+  table {{ width: 100%; border-collapse: collapse; margin-top: 16px; }}
+  th, td {{ border-bottom: 1px solid #2b3a53; padding: 9px; text-align: right; }} th:first-child, td:first-child {{ text-align: left; }}
+  th {{ color: #aab7ce; }} .ok {{ color: #70dc9b; }} .skip {{ color: #ffcf70; }}
+</style>
+</head>
+<body>
+<h1>XDS single-NPU stream benchmark</h1>
+<div id="meta" class="muted"></div>
+<section id="summary" class="cards"></section>
+<section class="panels">
+  <div class="panel"><h2>Throughput heatmap</h2><div id="heatmap"></div></div>
+  <div class="panel"><h2>Throughput by I/O depth</h2><div id="lines"></div></div>
+</section>
+<section class="panel" style="margin-top:16px"><h2>All results</h2><div id="table"></div></section>
+<script>
+const report = {data};
+const rows = report.results;
+const gib = value => (value / 1024 ** 3).toFixed(2);
+const sizeLabel = value => value >= 1024 ** 2 ? (value / 1024 ** 2) + 'M' : (value / 1024) + 'K';
+const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c]));
+const sizes = [...new Set(rows.map(row => row.size))].sort((a, b) => a - b);
+const depths = [...new Set(rows.map(row => row.io_depth))].sort((a, b) => a - b);
+const lookup = new Map(rows.map(row => [row.size + ':' + row.io_depth, row]));
+const best = report.best;
+
+document.querySelector('#meta').textContent = `file size: ${{gib(report.file_size)}} GiB · ${{rows.length}} parameter combinations`;
+document.querySelector('#summary').innerHTML = [
+  ['Best throughput', `${{gib(best.bandwidth_bytes_per_sec)}} GiB/s`],
+  ['Best request size', sizeLabel(best.size)],
+  ['Best I/O depth', best.io_depth],
+  ['Verification', best.verify.status],
+].map(([name, value]) => `<div class="card"><span class="muted">${{name}}</span><strong>${{value}}</strong></div>`).join('');
+
+function heatmap() {{
+  const cellW = 86, cellH = 48, left = 72, top = 32;
+  const width = left + depths.length * cellW + 12, height = top + sizes.length * cellH + 50;
+  const max = Math.max(...rows.map(row => row.bandwidth_bytes_per_sec));
+  let svg = `<svg viewBox="0 0 ${{width}} ${{height}}" role="img" aria-label="Throughput heatmap">`;
+  svg += `<text x="${{left}}" y="16" fill="#aab7ce">I/O depth</text>`;
+  depths.forEach((depth, x) => {{ svg += `<text x="${{left + x * cellW + cellW / 2}}" y="${{top - 8}}" fill="#aab7ce" text-anchor="middle">${{depth}}</text>`; }});
+  sizes.forEach((size, y) => {{
+    svg += `<text x="${{left - 9}}" y="${{top + y * cellH + cellH / 2 + 4}}" fill="#aab7ce" text-anchor="end">${{sizeLabel(size)}}</text>`;
+    depths.forEach((depth, x) => {{
+      const row = lookup.get(size + ':' + depth);
+      const fraction = row.bandwidth_bytes_per_sec / max;
+      const color = `hsl(${{220 - fraction * 170}}, 78%, ${{23 + fraction * 31}}%)`;
+      const px = left + x * cellW, py = top + y * cellH;
+      svg += `<rect x="${{px}}" y="${{py}}" width="${{cellW - 3}}" height="${{cellH - 3}}" rx="4" fill="${{color}}"><title>size=${{sizeLabel(size)}}, io-depth=${{depth}}: ${{gib(row.bandwidth_bytes_per_sec)}} GiB/s</title></rect>`;
+      svg += `<text x="${{px + (cellW - 3) / 2}}" y="${{py + 28}}" fill="white" font-size="12" text-anchor="middle">${{gib(row.bandwidth_bytes_per_sec)}}</text>`;
+    }});
+  }});
+  return svg + '</svg>';
+}}
+
+function lineChart() {{
+  const width = 650, height = 390, left = 65, right = 16, top = 20, bottom = 48;
+  const max = Math.max(...rows.map(row => row.bandwidth_bytes_per_sec)) / 1024 ** 3 * 1.1;
+  const x = index => left + index * (width - left - right) / Math.max(depths.length - 1, 1);
+  const y = value => top + (max - value) * (height - top - bottom) / max;
+  const colors = ['#6ba8ff','#71dc9c','#ffba69','#d595ff','#51d6d6','#ff7d9a','#d8d870'];
+  let svg = `<svg viewBox="0 0 ${{width}} ${{height}}" role="img" aria-label="Throughput line chart">`;
+  for (let tick = 0; tick <= 4; tick++) {{
+    const value = max * tick / 4, py = y(value);
+    svg += `<line x1="${{left}}" x2="${{width-right}}" y1="${{py}}" y2="${{py}}" stroke="#2b3a53"/>`;
+    svg += `<text x="${{left-8}}" y="${{py+4}}" fill="#aab7ce" text-anchor="end" font-size="12">${{value.toFixed(1)}}</text>`;
+  }}
+  depths.forEach((depth, index) => {{ svg += `<text x="${{x(index)}}" y="${{height-22}}" fill="#aab7ce" text-anchor="middle">${{depth}}</text>`; }});
+  svg += `<text x="${{width/2}}" y="${{height-5}}" fill="#aab7ce" text-anchor="middle">I/O depth</text>`;
+  sizes.forEach((size, series) => {{
+    const values = depths.map(depth => lookup.get(size + ':' + depth).bandwidth_bytes_per_sec / 1024 ** 3);
+    const points = values.map((value, index) => `${{x(index)}},${{y(value)}}`).join(' ');
+    svg += `<polyline points="${{points}}" fill="none" stroke="${{colors[series % colors.length]}}" stroke-width="2.5"><title>${{sizeLabel(size)}}</title></polyline>`;
+    values.forEach((value, index) => {{ svg += `<circle cx="${{x(index)}}" cy="${{y(value)}}" r="3" fill="${{colors[series % colors.length]}}"><title>${{sizeLabel(size)}}, depth=${{depths[index]}}: ${{value.toFixed(2)}} GiB/s</title></circle>`; }});
+  }});
+  sizes.forEach((size, index) => {{
+    const lx = left + (index % 3) * 110, ly = top + Math.floor(index / 3) * 18;
+    svg += `<rect x="${{lx}}" y="${{ly}}" width="10" height="10" fill="${{colors[index % colors.length]}}"/><text x="${{lx+15}}" y="${{ly+10}}" fill="#dfe7f5" font-size="12">${{sizeLabel(size)}}</text>`;
+  }});
+  return svg + '</svg>';
+}}
+
+document.querySelector('#heatmap').innerHTML = heatmap();
+document.querySelector('#lines').innerHTML = lineChart();
+document.querySelector('#table').innerHTML = `<table><thead><tr><th>Size</th><th>I/O depth</th><th>Bytes</th><th>Elapsed</th><th>Throughput</th><th>Verify</th></tr></thead><tbody>${{rows.map(row => `<tr><td>${{sizeLabel(row.size)}}</td><td>${{row.io_depth}}</td><td>${{row.bytes.toLocaleString()}}</td><td>${{(row.elapsed_ns / 1e9).toFixed(3)}} s</td><td>${{gib(row.bandwidth_bytes_per_sec)}} GiB/s</td><td class="${{row.verify.status === 'ok' ? 'ok' : 'skip'}}">${{escapeHtml(row.verify.status)}}</td></tr>`).join('')}}</tbody></table>`;
+</script>
+</body>
+</html>
+"""
+
+
 def run(args):
     torch, file_p2p = require_runtime(args)
     args.input = InputFile(args, args.offset + args.file_size)
@@ -166,7 +274,11 @@ def run(args):
         )
         payload = {"status": "PASS", "file_size": args.file_size, "results": results, "best": best}
         if args.json:
-            Path(args.json).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            json_path = Path(args.json)
+            json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            html_path = json_path.with_suffix(".html")
+            html_path.write_text(report_html(payload), encoding="utf-8")
+            print(f"REPORT json={json_path} html={html_path}", flush=True)
         return payload
     finally:
         if fd is not None:
