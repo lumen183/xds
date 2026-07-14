@@ -6,6 +6,7 @@ P2P request-size and queue-depth combination.  This intentionally uses only
 the stable single-request file_p2p API.
 """
 import argparse
+import html
 import json
 import os
 import sys
@@ -22,6 +23,8 @@ from tools.xds_test import (  # noqa: E402
     InputFile,
     TestFailure,
     check_result,
+    expected,
+    log,
     parse_size,
     require_runtime,
     verify,
@@ -63,30 +66,50 @@ def stream_once(torch, file_p2p, fd, args, request_size, io_depth):
     address = buffer.data_ptr()
     cursor = args.offset
     end = args.offset + args.file_size
+    log(
+        args,
+        "stream.alloc",
+        f"size={request_size} io_depth={io_depth} buffer_bytes={request_size * io_depth} "
+        f"addr=0x{address:x} range=[{args.offset},{end})",
+    )
     started = time.perf_counter_ns()
     try:
         while cursor < end:
             remaining = end - cursor
             count = min(io_depth, (remaining + request_size - 1) // request_size)
+            log(
+                args,
+                "stream.batch",
+                f"size={request_size} io_depth={io_depth} cursor={cursor} remaining={remaining} requests={count}",
+            )
             # The final request may be smaller, so the stream covers the whole
             # generated file even when --file-size is not a multiple of --size.
             for index in range(count):
                 length = min(request_size, end - (cursor + index * request_size))
+                file_offset = cursor + index * request_size
+                device_address = address + index * request_size
+                log(
+                    args,
+                    "stream.submit",
+                    f"index={index} file_offset={file_offset} device_address=0x{device_address:x} length={length}",
+                )
                 check_result(
                     "read_file",
                     file_p2p.read_file(
                         fd,
                         str(args.input.path),
                         args.bdev,
-                        cursor + index * request_size,
-                        address + index * request_size,
+                        file_offset,
+                        device_address,
                         length,
                         args.devid,
                         args.vfid,
                     ),
                 )
+            log(args, "stream.drain", f"cursor={cursor} requests={count}")
             check_result("drain_read", file_p2p.drain_read(fd))
             cursor += count * request_size
+            log(args, "stream.batch", f"complete next_cursor={cursor}")
     finally:
         elapsed_ns = time.perf_counter_ns() - started
     return buffer, elapsed_ns
@@ -107,19 +130,130 @@ def verify_samples(torch, file_p2p, fd, args, request_size):
     buffer = torch.empty(sample_size, dtype=torch.uint8, device=torch.device(f"npu:{args.devid}"))
     address = buffer.data_ptr()
     for offset in offsets:
+        log(
+            args,
+            "verify.submit",
+            f"file_offset={offset} device_address=0x{address:x} length={sample_size}",
+        )
         check_result(
             "read_file",
             file_p2p.read_file(fd, str(args.input.path), args.bdev, offset, address, sample_size, args.devid, args.vfid),
         )
+        log(args, "verify.drain", f"file_offset={offset}")
         check_result("drain_read", file_p2p.drain_read(fd))
         torch.npu.synchronize()
+        actual = buffer[:sample_size].cpu().numpy().tobytes()
+        wanted = expected(offset, sample_size)
+        if actual != wanted:
+            first = next((index for index, (got, want) in enumerate(zip(actual, wanted)) if got != want), None)
+            if first is None:
+                first = min(len(actual), len(wanted))
+            window_start = max(0, first - 8)
+            window_end = min(sample_size, first + 8)
+            log(
+                args,
+                "verify.mismatch",
+                f"sample_offset={offset} first_index={first} first_file_offset={offset + first} "
+                f"actual={actual[window_start:window_end].hex()} expected={wanted[window_start:window_end].hex()} "
+                f"window=[{window_start},{window_end})",
+            )
+        else:
+            log(
+                args,
+                "verify.ok",
+                f"file_offset={offset} length={sample_size} "
+                f"head={actual[:16].hex()} tail={actual[-16:].hex()}",
+            )
         verify(torch, buffer, offset, sample_size)
     return {"enabled": True, "status": "ok", "samples": len(offsets), "sample_size": sample_size}
 
 
+def _gib(value):
+    return f"{value / 1024 ** 3:.2f}"
+
+
+def _size_label(value):
+    return f"{value / 1024 ** 2:g}M" if value >= 1024 ** 2 else f"{value / 1024:g}K"
+
+
+def _heatmap_svg(rows, sizes, depths):
+    cell_w, cell_h, left, top = 86, 48, 72, 32
+    width = left + len(depths) * cell_w + 12
+    height = top + len(sizes) * cell_h + 50
+    maximum = max((row["bandwidth_bytes_per_sec"] for row in rows), default=1)
+    lookup = {(row["size"], row["io_depth"]): row for row in rows}
+    parts = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Throughput heatmap">']
+    parts.append(f'<text x="{left}" y="16" fill="#aab7ce">I/O depth</text>')
+    for x, depth in enumerate(depths):
+        parts.append(f'<text x="{left + x * cell_w + cell_w / 2}" y="24" fill="#aab7ce" text-anchor="middle">{depth}</text>')
+    for y, size in enumerate(sizes):
+        py = top + y * cell_h
+        parts.append(f'<text x="{left - 9}" y="{py + cell_h / 2 + 4}" fill="#aab7ce" text-anchor="end">{_size_label(size)}</text>')
+        for x, depth in enumerate(depths):
+            row = lookup.get((size, depth))
+            if row is None:
+                continue
+            fraction = row["bandwidth_bytes_per_sec"] / maximum
+            color = f"hsl({220 - fraction * 170:.1f}, 78%, {23 + fraction * 31:.1f}%)"
+            px = left + x * cell_w
+            label = f"size={_size_label(size)}, io-depth={depth}: {_gib(row['bandwidth_bytes_per_sec'])} GiB/s"
+            parts.append(f'<rect x="{px}" y="{py}" width="{cell_w - 3}" height="{cell_h - 3}" rx="4" fill="{color}"><title>{html.escape(label)}</title></rect>')
+            parts.append(f'<text x="{px + (cell_w - 3) / 2}" y="{py + 28}" fill="white" font-size="12" text-anchor="middle">{_gib(row["bandwidth_bytes_per_sec"])}</text>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _line_chart_svg(rows, sizes, depths):
+    width, height, left, right, top, bottom = 650, 390, 65, 16, 20, 48
+    maximum = max((row["bandwidth_bytes_per_sec"] for row in rows), default=1) / 1024 ** 3 * 1.1
+    x = lambda index: left + index * (width - left - right) / max(len(depths) - 1, 1)
+    y = lambda value: top + (maximum - value) * (height - top - bottom) / maximum
+    colors = ["#6ba8ff", "#71dc9c", "#ffba69", "#d595ff", "#51d6d6", "#ff7d9a", "#d8d870"]
+    lookup = {(row["size"], row["io_depth"]): row for row in rows}
+    parts = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Throughput line chart">']
+    for tick in range(5):
+        value = maximum * tick / 4
+        py = y(value)
+        parts.append(f'<line x1="{left}" x2="{width - right}" y1="{py:.1f}" y2="{py:.1f}" stroke="#2b3a53"/>')
+        parts.append(f'<text x="{left - 8}" y="{py + 4:.1f}" fill="#aab7ce" text-anchor="end" font-size="12">{value:.1f}</text>')
+    for index, depth in enumerate(depths):
+        parts.append(f'<text x="{x(index):.1f}" y="{height - 22}" fill="#aab7ce" text-anchor="middle">{depth}</text>')
+    parts.append(f'<text x="{width / 2}" y="{height - 5}" fill="#aab7ce" text-anchor="middle">I/O depth</text>')
+    for series, size in enumerate(sizes):
+        values = [lookup[(size, depth)]["bandwidth_bytes_per_sec"] / 1024 ** 3 for depth in depths if (size, depth) in lookup]
+        points = " ".join(f"{x(index):.1f},{y(value):.1f}" for index, value in enumerate(values))
+        color = colors[series % len(colors)]
+        parts.append(f'<polyline points="{points}" fill="none" stroke="{color}" stroke-width="2.5"><title>{_size_label(size)}</title></polyline>')
+        for index, value in enumerate(values):
+            parts.append(f'<circle cx="{x(index):.1f}" cy="{y(value):.1f}" r="3" fill="{color}"><title>{_size_label(size)}, depth={depths[index]}: {value:.2f} GiB/s</title></circle>')
+    for index, size in enumerate(sizes):
+        lx, ly = left + (index % 3) * 110, top + (index // 3) * 18
+        color = colors[index % len(colors)]
+        parts.append(f'<rect x="{lx}" y="{ly}" width="10" height="10" fill="{color}"/><text x="{lx + 15}" y="{ly + 10}" fill="#dfe7f5" font-size="12">{_size_label(size)}</text>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _results_table(rows):
+    body = []
+    for row in rows:
+        status = html.escape(str(row["verify"]["status"]))
+        body.append(
+            f'<tr><td>{_size_label(row["size"])}</td><td>{row["io_depth"]}</td>'
+            f'<td>{row["bytes"]:,}</td><td>{row["elapsed_ns"] / 1e9:.3f} s</td>'
+            f'<td>{_gib(row["bandwidth_bytes_per_sec"])} GiB/s</td>'
+            f'<td class="{"ok" if status == "ok" else "skip"}">{status}</td></tr>'
+        )
+    return "".join(body)
+
+
 def report_html(payload):
-    """Render a self-contained, offline HTML report for a completed scan."""
-    data = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
+    """Render a self-contained HTML report without requiring browser JavaScript."""
+    rows = payload["results"]
+    sizes = sorted({row["size"] for row in rows})
+    depths = sorted({row["io_depth"] for row in rows})
+    best = payload["best"]
+    meta = f"file size: {_gib(payload['file_size'])} GiB · {len(rows)} parameter combinations"
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -134,7 +268,7 @@ def report_html(payload):
   .card, .panel {{ background: #182131; border: 1px solid #2b3a53; border-radius: 10px; padding: 16px; }}
   .card strong {{ display: block; font-size: 1.35rem; margin-top: 5px; }}
   .panels {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 16px; }}
-  .panel {{ overflow-x: auto; }} svg {{ min-width: 480px; display: block; }}
+  .panel {{ overflow-x: auto; }} svg {{ min-width: 480px; max-width: 100%; height: auto; display: block; }}
   table {{ width: 100%; border-collapse: collapse; margin-top: 16px; }}
   th, td {{ border-bottom: 1px solid #2b3a53; padding: 9px; text-align: right; }} th:first-child, td:first-child {{ text-align: left; }}
   th {{ color: #aab7ce; }} .ok {{ color: #70dc9b; }} .skip {{ color: #ffcf70; }}
@@ -142,96 +276,39 @@ def report_html(payload):
 </head>
 <body>
 <h1>XDS single-NPU stream benchmark</h1>
-<div id="meta" class="muted"></div>
-<section id="summary" class="cards"></section>
-<section class="panels">
-  <div class="panel"><h2>Throughput heatmap</h2><div id="heatmap"></div></div>
-  <div class="panel"><h2>Throughput by I/O depth</h2><div id="lines"></div></div>
+<div class="muted">{html.escape(meta)}</div>
+<section class="cards">
+  <div class="card"><span class="muted">Best throughput</span><strong>{_gib(best['bandwidth_bytes_per_sec'])} GiB/s</strong></div>
+  <div class="card"><span class="muted">Best request size</span><strong>{_size_label(best['size'])}</strong></div>
+  <div class="card"><span class="muted">Best I/O depth</span><strong>{best['io_depth']}</strong></div>
+  <div class="card"><span class="muted">Verification</span><strong>{html.escape(str(best['verify']['status']))}</strong></div>
 </section>
-<section class="panel" style="margin-top:16px"><h2>All results</h2><div id="table"></div></section>
-<script>
-const report = {data};
-const rows = report.results;
-const gib = value => (value / 1024 ** 3).toFixed(2);
-const sizeLabel = value => value >= 1024 ** 2 ? (value / 1024 ** 2) + 'M' : (value / 1024) + 'K';
-const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c]));
-const sizes = [...new Set(rows.map(row => row.size))].sort((a, b) => a - b);
-const depths = [...new Set(rows.map(row => row.io_depth))].sort((a, b) => a - b);
-const lookup = new Map(rows.map(row => [row.size + ':' + row.io_depth, row]));
-const best = report.best;
-
-document.querySelector('#meta').textContent = `file size: ${{gib(report.file_size)}} GiB · ${{rows.length}} parameter combinations`;
-document.querySelector('#summary').innerHTML = [
-  ['Best throughput', `${{gib(best.bandwidth_bytes_per_sec)}} GiB/s`],
-  ['Best request size', sizeLabel(best.size)],
-  ['Best I/O depth', best.io_depth],
-  ['Verification', best.verify.status],
-].map(([name, value]) => `<div class="card"><span class="muted">${{name}}</span><strong>${{value}}</strong></div>`).join('');
-
-function heatmap() {{
-  const cellW = 86, cellH = 48, left = 72, top = 32;
-  const width = left + depths.length * cellW + 12, height = top + sizes.length * cellH + 50;
-  const max = Math.max(...rows.map(row => row.bandwidth_bytes_per_sec));
-  let svg = `<svg viewBox="0 0 ${{width}} ${{height}}" role="img" aria-label="Throughput heatmap">`;
-  svg += `<text x="${{left}}" y="16" fill="#aab7ce">I/O depth</text>`;
-  depths.forEach((depth, x) => {{ svg += `<text x="${{left + x * cellW + cellW / 2}}" y="${{top - 8}}" fill="#aab7ce" text-anchor="middle">${{depth}}</text>`; }});
-  sizes.forEach((size, y) => {{
-    svg += `<text x="${{left - 9}}" y="${{top + y * cellH + cellH / 2 + 4}}" fill="#aab7ce" text-anchor="end">${{sizeLabel(size)}}</text>`;
-    depths.forEach((depth, x) => {{
-      const row = lookup.get(size + ':' + depth);
-      const fraction = row.bandwidth_bytes_per_sec / max;
-      const color = `hsl(${{220 - fraction * 170}}, 78%, ${{23 + fraction * 31}}%)`;
-      const px = left + x * cellW, py = top + y * cellH;
-      svg += `<rect x="${{px}}" y="${{py}}" width="${{cellW - 3}}" height="${{cellH - 3}}" rx="4" fill="${{color}}"><title>size=${{sizeLabel(size)}}, io-depth=${{depth}}: ${{gib(row.bandwidth_bytes_per_sec)}} GiB/s</title></rect>`;
-      svg += `<text x="${{px + (cellW - 3) / 2}}" y="${{py + 28}}" fill="white" font-size="12" text-anchor="middle">${{gib(row.bandwidth_bytes_per_sec)}}</text>`;
-    }});
-  }});
-  return svg + '</svg>';
-}}
-
-function lineChart() {{
-  const width = 650, height = 390, left = 65, right = 16, top = 20, bottom = 48;
-  const max = Math.max(...rows.map(row => row.bandwidth_bytes_per_sec)) / 1024 ** 3 * 1.1;
-  const x = index => left + index * (width - left - right) / Math.max(depths.length - 1, 1);
-  const y = value => top + (max - value) * (height - top - bottom) / max;
-  const colors = ['#6ba8ff','#71dc9c','#ffba69','#d595ff','#51d6d6','#ff7d9a','#d8d870'];
-  let svg = `<svg viewBox="0 0 ${{width}} ${{height}}" role="img" aria-label="Throughput line chart">`;
-  for (let tick = 0; tick <= 4; tick++) {{
-    const value = max * tick / 4, py = y(value);
-    svg += `<line x1="${{left}}" x2="${{width-right}}" y1="${{py}}" y2="${{py}}" stroke="#2b3a53"/>`;
-    svg += `<text x="${{left-8}}" y="${{py+4}}" fill="#aab7ce" text-anchor="end" font-size="12">${{value.toFixed(1)}}</text>`;
-  }}
-  depths.forEach((depth, index) => {{ svg += `<text x="${{x(index)}}" y="${{height-22}}" fill="#aab7ce" text-anchor="middle">${{depth}}</text>`; }});
-  svg += `<text x="${{width/2}}" y="${{height-5}}" fill="#aab7ce" text-anchor="middle">I/O depth</text>`;
-  sizes.forEach((size, series) => {{
-    const values = depths.map(depth => lookup.get(size + ':' + depth).bandwidth_bytes_per_sec / 1024 ** 3);
-    const points = values.map((value, index) => `${{x(index)}},${{y(value)}}`).join(' ');
-    svg += `<polyline points="${{points}}" fill="none" stroke="${{colors[series % colors.length]}}" stroke-width="2.5"><title>${{sizeLabel(size)}}</title></polyline>`;
-    values.forEach((value, index) => {{ svg += `<circle cx="${{x(index)}}" cy="${{y(value)}}" r="3" fill="${{colors[series % colors.length]}}"><title>${{sizeLabel(size)}}, depth=${{depths[index]}}: ${{value.toFixed(2)}} GiB/s</title></circle>`; }});
-  }});
-  sizes.forEach((size, index) => {{
-    const lx = left + (index % 3) * 110, ly = top + Math.floor(index / 3) * 18;
-    svg += `<rect x="${{lx}}" y="${{ly}}" width="10" height="10" fill="${{colors[index % colors.length]}}"/><text x="${{lx+15}}" y="${{ly+10}}" fill="#dfe7f5" font-size="12">${{sizeLabel(size)}}</text>`;
-  }});
-  return svg + '</svg>';
-}}
-
-document.querySelector('#heatmap').innerHTML = heatmap();
-document.querySelector('#lines').innerHTML = lineChart();
-document.querySelector('#table').innerHTML = `<table><thead><tr><th>Size</th><th>I/O depth</th><th>Bytes</th><th>Elapsed</th><th>Throughput</th><th>Verify</th></tr></thead><tbody>${{rows.map(row => `<tr><td>${{sizeLabel(row.size)}}</td><td>${{row.io_depth}}</td><td>${{row.bytes.toLocaleString()}}</td><td>${{(row.elapsed_ns / 1e9).toFixed(3)}} s</td><td>${{gib(row.bandwidth_bytes_per_sec)}} GiB/s</td><td class="${{row.verify.status === 'ok' ? 'ok' : 'skip'}}">${{escapeHtml(row.verify.status)}}</td></tr>`).join('')}}</tbody></table>`;
-</script>
+<section class="panels">
+  <div class="panel"><h2>Throughput heatmap</h2>{_heatmap_svg(rows, sizes, depths)}</div>
+  <div class="panel"><h2>Throughput by I/O depth</h2>{_line_chart_svg(rows, sizes, depths)}</div>
+</section>
+<section class="panel" style="margin-top:16px"><h2>All results</h2><table><thead><tr><th>Size</th><th>I/O depth</th><th>Bytes</th><th>Elapsed</th><th>Throughput</th><th>Verify</th></tr></thead><tbody>{_results_table(rows)}</tbody></table></section>
 </body>
 </html>
 """
 
 
 def run(args):
+    args.log_started = time.monotonic()
+    log(
+        args,
+        "run.start",
+        f"bdev={args.bdev} data_dir={args.data_dir} file_size={args.file_size} "
+        f"sizes={args.sizes} io_depths={args.io_depths} offset={args.offset} "
+        f"devid={args.devid} vfid={args.vfid} verify={args.verify}",
+    )
     torch, file_p2p = require_runtime(args)
     args.input = InputFile(args, args.offset + args.file_size)
     fd = None
     try:
         fd = file_p2p.new_p2p_fd()
         check_result("new_p2p_fd", fd)
+        log(args, "p2p.open", f"fd={fd}")
         results = []
         for request_size in args.sizes:
             for io_depth in args.io_depths:
