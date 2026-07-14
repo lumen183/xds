@@ -6,6 +6,12 @@
 
 本文描述已实现脚手架的行为和使用约定，并作为后续改动的验收标准。
 
+> 当前实现状态：`single` 可用于真机链路验证和端到端趋势测试；它的计时包含用户态
+> FIEMAP/open/ioctl 与内核提交/等待开销。驱动尚未把完成错误回传给 `drain_read()`，
+> 因此严格完成状态依赖后续修复。`batch` 的末尾请求存在越界访问风险，在修复并完成
+> 真机回归前不得用于正确性或性能结论。完整背景、测量边界和修复清单见
+> [README](../README.md)。
+
 ## 1. 要解决的问题
 
 XDS 的真实路径不是一个普通的 Python 函数调用，原因在于它同时跨越了几个层次：
@@ -248,9 +254,10 @@ single  每个请求调用 read_file
 batch   调用 read_file_batch，一次提交连续分块
 ```
 
-未指定 `--api` 时，建议依次运行 single 和 batch，并分别输出结果。batch 仅用于
-连续源文件范围；当前用户态实现按第一个请求的 `bdev_offset` 和
-`size * param_num` 获取 FIEMAP，不能把任意跳跃 offset 当作通用批读。
+`batch` 仅用于连续源文件范围；当前用户态实现按第一个请求的 `bdev_offset` 和
+`size * param_num` 获取 FIEMAP，不能把任意跳跃 offset 当作通用批读。当前内核
+batch 末尾处理尚有越界风险，修复前只可执行 `--api single`；不要省略 `--api`，否则
+脚本会依次运行 single 与 batch。
 
 ### 8.2 in-flight 请求
 
@@ -441,7 +448,7 @@ dmesg | tail -n 80
 
 1. `setup` 能给出清晰的环境缺项，并能复用已加载模块；
 2. `smoke` 能自动生成文件、完成真实 P2P 读并报告校验结果；
-3. `bench` 支持 single/batch、warmup、iterations 和 inflight；
+3. 修复 batch 末尾越界后，`bench` 支持 single/batch、warmup、iterations 和 inflight；
 4. bench 计时不包括最终 NPU→CPU 校验拷贝；
 5. bench 默认校验，`--no-verify` 必须显式指定；
 6. stdout 输出简洁核心指标，`--json` 保存详细结果；

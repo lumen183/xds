@@ -15,6 +15,11 @@ from pathlib import Path
 FS_IOC_FIEMAP = 0xC020660B
 FIEMAP_EXTENT_UNWRITTEN = 0x00000800
 _MIB = 1024 * 1024
+_FIEMAP_HEADER_SIZE = 32
+_FIEMAP_EXTENT_SIZE = 56
+# Keep each ioctl allocation modest, but never mistake a full page for the end
+# of a fragmented file's extent map.
+_FIEMAP_EXTENTS_PER_QUERY = 256
 
 
 class TestFailure(RuntimeError):
@@ -74,30 +79,41 @@ def write_pattern(fd, size):
 
 def fiemap_check(path, offset, length, args):
     """Verify requested bytes have allocated, written FIEMAP extents."""
-    # fiemap (32 bytes) + 256 fiemap_extent records (56 bytes).
-    buffer = bytearray(32 + 256 * 56)
     import struct
-    struct.pack_into("=QQIIII", buffer, 0, offset, length, 0, 0, 256, 0)
     fd = os.open(path, os.O_RDONLY)
+    cursor = offset
+    end = offset + length
+    total_mapped = 0
     try:
-        fcntl.ioctl(fd, FS_IOC_FIEMAP, buffer, True)
+        while cursor < end:
+            # FIEMAP returns at most fm_extent_count records.  A full result is
+            # not an error: query again from the byte just covered.
+            buffer = bytearray(_FIEMAP_HEADER_SIZE + _FIEMAP_EXTENTS_PER_QUERY * _FIEMAP_EXTENT_SIZE)
+            struct.pack_into("=QQIIII", buffer, 0, cursor, end - cursor, 0, 0, _FIEMAP_EXTENTS_PER_QUERY, 0)
+            fcntl.ioctl(fd, FS_IOC_FIEMAP, buffer, True)
+            _, _, _, mapped, _, _ = struct.unpack_from("=QQIIII", buffer, 0)
+            total_mapped += mapped
+            log(args, "fiemap", f"path={path} offset={cursor} length={end - cursor} mapped_extents={mapped} total_mapped_extents={total_mapped}")
+            if not mapped:
+                raise TestFailure("FIEMAP returned no extents; the file may be sparse")
+
+            next_cursor = cursor
+            for index in range(mapped):
+                logical, _physical, extent_length, _r1, _r2, flags, *_ = struct.unpack_from(
+                    "=QQQQQIIII", buffer, _FIEMAP_HEADER_SIZE + index * _FIEMAP_EXTENT_SIZE)
+                if flags & FIEMAP_EXTENT_UNWRITTEN or logical > cursor:
+                    raise TestFailure("FIEMAP shows an unwritten or sparse extent")
+                next_cursor = max(next_cursor, logical + extent_length)
+                if next_cursor >= end:
+                    log(args, "fiemap", f"path={path} coverage=complete extents={total_mapped}")
+                    return
+            if next_cursor <= cursor:
+                raise TestFailure("FIEMAP made no progress while checking requested read range")
+            cursor = next_cursor
     except OSError as exc:
         raise TestFailure(f"FIEMAP failed for {path}: {exc}") from exc
     finally:
         os.close(fd)
-    _, _, _, mapped, _, _ = struct.unpack_from("=QQIIII", buffer, 0)
-    log(args, "fiemap", f"path={path} offset={offset} length={length} mapped_extents={mapped}")
-    if not mapped:
-        raise TestFailure("FIEMAP returned no extents; the file may be sparse")
-    cursor = offset
-    end = offset + length
-    for index in range(mapped):
-        logical, _physical, extent_length, _r1, _r2, flags, *_ = struct.unpack_from("=QQQQQIIII", buffer, 32 + index * 56)
-        if flags & FIEMAP_EXTENT_UNWRITTEN or logical > cursor:
-            raise TestFailure("FIEMAP shows an unwritten or sparse extent")
-        cursor = max(cursor, logical + extent_length)
-        if cursor >= end:
-            return
     raise TestFailure("FIEMAP extents do not cover requested read range")
 
 
