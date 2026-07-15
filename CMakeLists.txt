@@ -168,11 +168,20 @@ if(XDS_BUILD_TESTS)
             NAME cpp_stream_bench_invalid_size
             COMMAND single_npu_stream_bench --file-size 0
         )
-        set_tests_properties(cpp_stream_bench_invalid_size PROPERTIES WILL_FAIL TRUE)
+        add_test(
+            NAME cpp_stream_bench_invalid_batch_delay
+            COMMAND single_npu_stream_bench --batch-delay -1
+        )
+        set_tests_properties(
+            cpp_stream_bench_invalid_size
+            cpp_stream_bench_invalid_batch_delay
+            PROPERTIES WILL_FAIL TRUE
+        )
         set(XDS_BACKEND_TESTS
             python_extension_smoke
             cpp_stream_bench_help
             cpp_stream_bench_invalid_size
+            cpp_stream_bench_invalid_batch_delay
         )
     else()
         add_test(

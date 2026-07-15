@@ -6,7 +6,9 @@ P2P request-size and queue-depth combination.  This intentionally uses only
 the stable single-request file_p2p API.
 """
 import argparse
+import gc
 import json
+import math
 import os
 import sys
 import tempfile
@@ -94,6 +96,16 @@ def parse_positive_integer(value):
         raise argparse.ArgumentTypeError("value must be a positive integer") from exc
     if number < 1:
         raise argparse.ArgumentTypeError("value must be a positive integer")
+    return number
+
+
+def parse_nonnegative_float(value):
+    try:
+        number = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("value must be a non-negative number") from exc
+    if not math.isfinite(number) or number < 0:
+        raise argparse.ArgumentTypeError("value must be a finite non-negative number")
     return number
 
 
@@ -207,6 +219,7 @@ def stream_once(torch, file_p2p, fd, args, request_size, io_depth):
         f"addr=0x{address:x} range=[{args.offset},{end})",
     )
     started = time.perf_counter_ns()
+    throttle_sleep_ns = 0
     try:
         while cursor < end:
             remaining = end - cursor
@@ -244,9 +257,16 @@ def stream_once(torch, file_p2p, fd, args, request_size, io_depth):
             check_result("drain_read", file_p2p.drain_read(fd))
             cursor += count * request_size
             log(args, "stream.batch", f"complete next_cursor={cursor}")
+            if args.batch_delay and cursor < end:
+                sleep_started = time.perf_counter_ns()
+                time.sleep(args.batch_delay)
+                throttle_sleep_ns += time.perf_counter_ns() - sleep_started
     finally:
-        elapsed_ns = time.perf_counter_ns() - started
-    return buffer, elapsed_ns
+        wall_elapsed_ns = time.perf_counter_ns() - started
+    # Deliberate safety throttling must not make the device's active transfer
+    # bandwidth look lower.  Preserve both active and wall-clock durations.
+    elapsed_ns = max(0, wall_elapsed_ns - throttle_sleep_ns)
+    return buffer, elapsed_ns, wall_elapsed_ns, throttle_sleep_ns
 
 
 def sample_request_indices(total_requests, target, seed, request_size, io_depth):
@@ -415,6 +435,8 @@ def verify_pass(torch, file_p2p, fd, args, request_size, io_depth):
                 address + unused_start,
             )
         batches += 1
+        if args.batch_delay and start + io_depth < len(request_indices):
+            time.sleep(args.batch_delay)
 
     return {
         "enabled": True,
@@ -428,6 +450,21 @@ def verify_pass(torch, file_p2p, fd, args, request_size, io_depth):
         "bytes": verified_bytes,
         "elapsed_ns": time.perf_counter_ns() - started,
     }
+
+
+def isolate_test_resources(torch, file_p2p, fd, args):
+    """Close one test's P2P context and force NPU/Python resource release."""
+    log(args, "test.isolate", f"begin fd={fd}")
+    try:
+        torch.npu.synchronize()
+    finally:
+        file_p2p.close_p2p_fd(fd)
+    gc.collect()
+    empty_cache = getattr(torch.npu, "empty_cache", None)
+    if callable(empty_cache):
+        empty_cache()
+    torch.npu.synchronize()
+    log(args, "test.isolate", f"complete fd={fd}")
 
 
 def log_host_file_samples(args):
@@ -468,7 +505,8 @@ def run(args):
         f"sizes={args.sizes} io_depths={args.io_depths} offset={args.offset} "
         f"devid={args.devid} vfid={args.vfid} verify_mode={args.verify_mode} "
         f"verify_samples={args.verify_samples} pattern={PATTERN_NAME} "
-        f"pattern_seed=0x{args.pattern_seed:016x}",
+        f"pattern_seed=0x{args.pattern_seed:016x} isolate_tests={args.isolate_tests} "
+        f"inter_test_delay={args.inter_test_delay} batch_delay={args.batch_delay}",
     )
     torch, file_p2p = require_runtime(args)
     require_numpy()
@@ -476,19 +514,32 @@ def run(args):
     log_host_file_samples(args)
     fd = None
     try:
-        fd = file_p2p.new_p2p_fd()
-        check_result("new_p2p_fd", fd)
-        log(args, "p2p.open", f"fd={fd}")
+        if not args.isolate_tests:
+            fd = file_p2p.new_p2p_fd()
+            check_result("new_p2p_fd", fd)
+            log(args, "p2p.open", f"fd={fd}")
         results = []
-        for request_size in args.sizes:
-            for io_depth in args.io_depths:
-                buffer, elapsed_ns = stream_once(torch, file_p2p, fd, args, request_size, io_depth)
+        combinations = [
+            (request_size, io_depth)
+            for request_size in args.sizes
+            for io_depth in args.io_depths
+        ]
+        for test_index, (request_size, io_depth) in enumerate(combinations):
+            test_fd = fd
+            if args.isolate_tests:
+                test_fd = file_p2p.new_p2p_fd()
+                check_result("new_p2p_fd", test_fd)
+                log(args, "p2p.open", f"fd={test_fd} test={test_index + 1}/{len(combinations)}")
+            try:
+                buffer, elapsed_ns, wall_elapsed_ns, throttle_sleep_ns = stream_once(
+                    torch, file_p2p, test_fd, args, request_size, io_depth
+                )
                 bandwidth = args.file_size * 1_000_000_000 / elapsed_ns if elapsed_ns else 0
                 # The measured pass is fully drained; release its destination
                 # before allocating the independent verification-pass buffer.
                 del buffer
                 verification = (
-                    verify_pass(torch, file_p2p, fd, args, request_size, io_depth)
+                    verify_pass(torch, file_p2p, test_fd, args, request_size, io_depth)
                     if args.verify_mode != "none"
                     else {"enabled": False, "status": "skipped", "mode": "none"}
                 )
@@ -505,6 +556,8 @@ def run(args):
                     "io_depth": io_depth,
                     "bytes": args.file_size,
                     "elapsed_ns": elapsed_ns,
+                    "wall_elapsed_ns": wall_elapsed_ns,
+                    "throttle_sleep_ns": throttle_sleep_ns,
                     "bandwidth_bytes_per_sec": bandwidth,
                     "verify": verification,
                 }
@@ -514,6 +567,12 @@ def run(args):
                     f"bandwidth={bandwidth / 1024**3:.2f}GiB/s verify={verification['status']}",
                     flush=True,
                 )
+            finally:
+                if args.isolate_tests and test_fd is not None:
+                    isolate_test_resources(torch, file_p2p, test_fd, args)
+            if args.inter_test_delay and test_index + 1 < len(combinations):
+                log(args, "test.cooldown", f"seconds={args.inter_test_delay}")
+                time.sleep(args.inter_test_delay)
         best = max(results, key=lambda item: item["bandwidth_bytes_per_sec"])
         print(
             f"BEST size={best['size']}B io_depth={best['io_depth']} "
@@ -525,6 +584,9 @@ def run(args):
             "file_size": args.file_size,
             "pattern": PATTERN_NAME,
             "pattern_seed": f"0x{args.pattern_seed:016x}",
+            "isolate_tests": args.isolate_tests,
+            "inter_test_delay": args.inter_test_delay,
+            "batch_delay": args.batch_delay,
             "results": results,
             "best": best,
         }
@@ -578,6 +640,25 @@ def parser():
         type=parse_uint64,
         default=DEFAULT_PATTERN_SEED,
         help=f"splitmix64-v1 seed, decimal or 0x-prefixed (default: 0x{DEFAULT_PATTERN_SEED:016x})",
+    )
+    root.add_argument(
+        "--isolate-tests",
+        action="store_true",
+        help="give every size/io-depth combination a fresh P2P fd and force NPU/cache cleanup afterward",
+    )
+    root.add_argument(
+        "--inter-test-delay",
+        type=parse_nonnegative_float,
+        default=0.0,
+        metavar="SECONDS",
+        help="cooldown between size/io-depth combinations (default: 0)",
+    )
+    root.add_argument(
+        "--batch-delay",
+        type=parse_nonnegative_float,
+        default=0.0,
+        metavar="SECONDS",
+        help="sleep between drain batches to limit sustained load; excluded from active bandwidth (default: 0)",
     )
     root.add_argument("--json", help="write all results as JSON")
     root.add_argument("--verbose", action="store_true", help="accepted for consistency with tools/xds_test.py")

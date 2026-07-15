@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -12,11 +13,13 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <vector>
 
 #include <fcntl.h>
@@ -56,6 +59,9 @@ struct Args {
     std::uint32_t vfid = 0;
     bool verify = true;
     bool verbose = false;
+    bool isolate_tests = false;
+    double inter_test_delay = 0.0;
+    double batch_delay = 0.0;
     fs::path json;
 };
 
@@ -70,8 +76,16 @@ struct Result {
     std::uint32_t size;
     std::uint32_t io_depth;
     std::uint64_t elapsed_ns;
+    std::uint64_t wall_elapsed_ns;
+    std::uint64_t throttle_sleep_ns;
     double bandwidth;
     Verification verification;
+};
+
+struct StreamMetrics {
+    std::uint64_t elapsed_ns;
+    std::uint64_t wall_elapsed_ns;
+    std::uint64_t throttle_sleep_ns;
 };
 
 Clock::time_point g_started;
@@ -194,6 +208,30 @@ std::vector<std::uint32_t> parse_depth_list(const std::string &value)
     return result;
 }
 
+double parse_nonnegative_seconds(const std::string &value, const std::string &option)
+{
+    std::size_t parsed = 0;
+    double seconds;
+    try {
+        seconds = std::stod(value, &parsed);
+    } catch (const std::exception &) {
+        throw Failure(option + " must be a finite non-negative number");
+    }
+    if (parsed != value.size() || !std::isfinite(seconds) || seconds < 0.0)
+        throw Failure(option + " must be a finite non-negative number");
+    return seconds;
+}
+
+std::uint64_t sleep_seconds(double seconds)
+{
+    if (seconds == 0.0)
+        return 0;
+    const auto started = Clock::now();
+    std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
+    return static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - started).count());
+}
+
 void usage(std::ostream &stream, const char *program)
 {
     stream << "Usage: " << program << " --bdev DEVICE --data-dir DIR [options]\n\n"
@@ -208,6 +246,9 @@ void usage(std::ostream &stream, const char *program)
            << "  --vfid ID            Ascend virtual device id (default: 0)\n"
            << "  --verify             verify first/middle/last samples (default)\n"
            << "  --no-verify          skip sample verification\n"
+           << "  --isolate-tests      use a fresh P2P fd and synchronize after each combination\n"
+           << "  --inter-test-delay S cooldown between combinations in seconds (default: 0)\n"
+           << "  --batch-delay S      sleep between drain batches in seconds (default: 0)\n"
            << "  --json PATH          write result JSON\n"
            << "  --verbose            print phase diagnostics\n"
            << "  -h, --help           show this help\n";
@@ -263,6 +304,12 @@ Args parse_args(int argc, char **argv)
             args.verify = true;
         } else if (option == "--no-verify") {
             args.verify = false;
+        } else if (option == "--isolate-tests") {
+            args.isolate_tests = true;
+        } else if (option == "--inter-test-delay") {
+            args.inter_test_delay = parse_nonnegative_seconds(value(i, option), option);
+        } else if (option == "--batch-delay") {
+            args.batch_delay = parse_nonnegative_seconds(value(i, option), option);
         } else if (option == "--json") {
             args.json = value(i, option);
         } else if (option == "--verbose") {
@@ -500,21 +547,30 @@ private:
 
 class P2pFd {
 public:
-    P2pFd()
+    explicit P2pFd(bool synchronize_before_close = false)
+        : synchronize_before_close_(synchronize_before_close)
     {
         if (::access("/dev/p2p_device", R_OK | W_OK) < 0)
             throw Failure("/dev/p2p_device is unavailable: " + errno_message(errno));
         fd_ = new_p2p_fd();
         check_io("new_p2p_fd", fd_);
     }
-    ~P2pFd() { if (fd_ >= 0) close_p2p_fd(fd_); }
+    ~P2pFd()
+    {
+        if (fd_ >= 0) {
+            if (synchronize_before_close_)
+                aclrtSynchronizeDevice();
+            close_p2p_fd(fd_);
+        }
+    }
     int get() const { return fd_; }
 
 private:
     int fd_ = -1;
+    bool synchronize_before_close_ = false;
 };
 
-std::uint64_t stream_once(int fd, const Args &args, const fs::path &input,
+StreamMetrics stream_once(int fd, const Args &args, const fs::path &input,
                           std::uint32_t request_size, std::uint32_t io_depth)
 {
     const std::size_t buffer_size = static_cast<std::size_t>(request_size) * io_depth;
@@ -525,6 +581,7 @@ std::uint64_t stream_once(int fd, const Args &args, const fs::path &input,
     log(args, "stream.alloc", "size=" + std::to_string(request_size) +
         " io_depth=" + std::to_string(io_depth) + " buffer_bytes=" + std::to_string(buffer_size));
     const auto started = Clock::now();
+    std::uint64_t throttle_sleep_ns = 0;
     while (cursor < end) {
         const std::uint64_t remaining = end - cursor;
         const std::uint64_t needed = (remaining + request_size - 1) / request_size;
@@ -541,9 +598,13 @@ std::uint64_t stream_once(int fd, const Args &args, const fs::path &input,
         }
         check_io("drain_read", drain_read(fd));
         cursor += static_cast<std::uint64_t>(count) * request_size;
+        if (cursor < end)
+            throttle_sleep_ns += sleep_seconds(args.batch_delay);
     }
-    return static_cast<std::uint64_t>(
+    const auto wall_elapsed_ns = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - started).count());
+    return {wall_elapsed_ns - std::min(wall_elapsed_ns, throttle_sleep_ns),
+            wall_elapsed_ns, throttle_sleep_ns};
 }
 
 Verification verify_samples(int fd, const Args &args, const fs::path &input, std::uint32_t request_size)
@@ -561,7 +622,8 @@ Verification verify_samples(int fd, const Args &args, const fs::path &input, std
     const auto raw_address = reinterpret_cast<std::uintptr_t>(raw.data());
     const auto address = (raw_address + 4095) & ~static_cast<std::uintptr_t>(4095);
     std::vector<unsigned char> actual(static_cast<std::size_t>(sample_size));
-    for (auto offset : offsets) {
+    for (std::size_t sample_index = 0; sample_index < offsets.size(); ++sample_index) {
+        const auto offset = offsets[sample_index];
         read_parameter parameter {
             input.c_str(), args.bdev.c_str(), static_cast<unsigned long>(offset),
             static_cast<unsigned short>(args.devid), static_cast<unsigned short>(args.vfid),
@@ -592,6 +654,8 @@ Verification verify_samples(int fd, const Args &args, const fs::path &input, std
                     << " mismatch_count=" << mismatch_count;
             throw Failure(message.str());
         }
+        if (sample_index + 1 < offsets.size())
+            sleep_seconds(args.batch_delay);
     }
     return {true, "ok", offsets.size(), sample_size};
 }
@@ -634,7 +698,10 @@ void write_json(const fs::path &path, const Args &args, const fs::path &input,
     if (!output)
         throw Failure("cannot write JSON: " + path.string());
     output << std::setprecision(17);
-    output << "{\n  \"status\": \"PASS\",\n  \"file_size\": " << args.file_size << ",\n  \"results\": [\n";
+    output << "{\n  \"status\": \"PASS\",\n  \"file_size\": " << args.file_size
+           << ",\n  \"isolate_tests\": " << (args.isolate_tests ? "true" : "false")
+           << ",\n  \"inter_test_delay\": " << args.inter_test_delay
+           << ",\n  \"batch_delay\": " << args.batch_delay << ",\n  \"results\": [\n";
     for (std::size_t index = 0; index < results.size(); ++index) {
         const auto &result = results[index];
         output << "    {\"status\":\"PASS\",\"api\":\"single\",\"bdev\":\""
@@ -643,6 +710,8 @@ void write_json(const fs::path &path, const Args &args, const fs::path &input,
                << ",\"offset\":" << args.offset << ",\"file_size\":" << args.file_size
                << ",\"size\":" << result.size << ",\"io_depth\":" << result.io_depth
                << ",\"bytes\":" << args.file_size << ",\"elapsed_ns\":" << result.elapsed_ns
+               << ",\"wall_elapsed_ns\":" << result.wall_elapsed_ns
+               << ",\"throttle_sleep_ns\":" << result.throttle_sleep_ns
                << ",\"bandwidth_bytes_per_sec\":" << result.bandwidth << ",\"verify\":";
         write_verification(output, result.verification);
         output << '}' << (index + 1 == results.size() ? "\n" : ",\n");
@@ -654,6 +723,8 @@ void write_json(const fs::path &path, const Args &args, const fs::path &input,
            << ",\"offset\":" << args.offset << ",\"file_size\":" << args.file_size
            << ",\"size\":" << winner.size << ",\"io_depth\":" << winner.io_depth
            << ",\"bytes\":" << args.file_size << ",\"elapsed_ns\":" << winner.elapsed_ns
+           << ",\"wall_elapsed_ns\":" << winner.wall_elapsed_ns
+           << ",\"throttle_sleep_ns\":" << winner.throttle_sleep_ns
            << ",\"bandwidth_bytes_per_sec\":" << winner.bandwidth << ",\"verify\":";
     write_verification(output, winner.verification);
     output << "}\n}\n";
@@ -664,23 +735,50 @@ void write_json(const fs::path &path, const Args &args, const fs::path &input,
 int run(const Args &args)
 {
     g_started = Clock::now();
-    log(args, "run.start", "bdev=" + args.bdev + " data_dir=" + args.data_dir.string());
+    log(args, "run.start", "bdev=" + args.bdev + " data_dir=" + args.data_dir.string() +
+        " isolate_tests=" + (args.isolate_tests ? "true" : "false") +
+        " inter_test_delay=" + std::to_string(args.inter_test_delay) +
+        " batch_delay=" + std::to_string(args.batch_delay));
     AclRuntime runtime(args.devid);
     InputFile input(args, args.offset + args.file_size);
-    P2pFd p2p;
+    std::unique_ptr<P2pFd> shared_p2p;
+    if (!args.isolate_tests)
+        shared_p2p = std::make_unique<P2pFd>();
     std::vector<Result> results;
+    const std::size_t combination_count = args.sizes.size() * args.io_depths.size();
+    std::size_t combination_index = 0;
     for (auto request_size : args.sizes) {
         for (auto io_depth : args.io_depths) {
-            const auto elapsed_ns = stream_once(p2p.get(), args, input.path(), request_size, io_depth);
-            const double bandwidth = elapsed_ns ?
-                static_cast<double>(args.file_size) * 1'000'000'000.0 / static_cast<double>(elapsed_ns) : 0.0;
+            std::unique_ptr<P2pFd> isolated_p2p;
+            P2pFd *p2p = shared_p2p.get();
+            if (args.isolate_tests) {
+                isolated_p2p = std::make_unique<P2pFd>(true);
+                p2p = isolated_p2p.get();
+                log(args, "p2p.open", "test=" + std::to_string(combination_index + 1) +
+                    "/" + std::to_string(combination_count));
+            }
+            const auto metrics = stream_once(p2p->get(), args, input.path(), request_size, io_depth);
+            const double bandwidth = metrics.elapsed_ns ?
+                static_cast<double>(args.file_size) * 1'000'000'000.0 /
+                    static_cast<double>(metrics.elapsed_ns) : 0.0;
             const Verification verification = args.verify ?
-                verify_samples(p2p.get(), args, input.path(), request_size) : Verification{};
-            results.push_back({request_size, io_depth, elapsed_ns, bandwidth, verification});
+                verify_samples(p2p->get(), args, input.path(), request_size) : Verification{};
+            if (args.isolate_tests) {
+                check_acl("aclrtSynchronizeDevice", aclrtSynchronizeDevice());
+                isolated_p2p.reset();
+                log(args, "test.isolate", "complete test=" + std::to_string(combination_index + 1));
+            }
+            results.push_back({request_size, io_depth, metrics.elapsed_ns, metrics.wall_elapsed_ns,
+                               metrics.throttle_sleep_ns, bandwidth, verification});
             std::cout << "PASS size=" << request_size << "B io_depth=" << io_depth
                       << " bytes=" << args.file_size << " bandwidth=" << std::fixed << std::setprecision(2)
                       << bandwidth / (1024.0 * 1024 * 1024) << "GiB/s verify=" << verification.status
                       << std::endl;
+            ++combination_index;
+            if (combination_index < combination_count && args.inter_test_delay > 0.0) {
+                log(args, "test.cooldown", "seconds=" + std::to_string(args.inter_test_delay));
+                sleep_seconds(args.inter_test_delay);
+            }
         }
     }
     const auto best = static_cast<std::size_t>(std::distance(results.begin(),
