@@ -122,8 +122,10 @@ int read_file(int dev_fd, struct read_parameter *param)
 
     total_size = 0;
     ext_num = exts->fm_mapped_extents;
-    exts->fm_extents[0].fe_physical += param->bdev_offset % 4096;
-    exts->fm_extents[0].fe_length -= param->bdev_offset % 4096;
+    exts->fm_extents[0].fe_physical +=
+        param->bdev_offset - exts->fm_extents[0].fe_logical;
+    exts->fm_extents[0].fe_length -=
+        param->bdev_offset - exts->fm_extents[0].fe_logical;
     
     for (i = 0; i < ext_num; i++) {
         if (total_size + exts->fm_extents[i].fe_length > param->size) {
@@ -239,8 +241,10 @@ int read_file_batch(int dev_fd, struct read_parameter *param, int param_num)
 
     total_size = 0;
     ext_num = exts->fm_mapped_extents;
-    exts->fm_extents[0].fe_physical += param[0].bdev_offset % 4096;
-    exts->fm_extents[0].fe_length -= param[0].bdev_offset % 4096;
+    exts->fm_extents[0].fe_physical +=
+        param[0].bdev_offset - exts->fm_extents[0].fe_logical;
+    exts->fm_extents[0].fe_length -=
+        param[0].bdev_offset - exts->fm_extents[0].fe_logical;
     
     for (i = 0; i < ext_num; i++) {
         if (total_size + exts->fm_extents[i].fe_length > max_size) {
