@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>XDS 单盘单卡 P2P Benchmark 数据报告</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --panel: #0d1b2d;
+      --panel-2: #11233a;
+      --line: #253b55;
+      --text: #e8f0fa;
+      --muted: #91a6bd;
+      --cyan: #32d5ff;
+      --green: #5be49b;
+      --yellow: #ffc857;
+      --red: #ff6b78;
+      --purple: #a78bfa;
+      --blue: #60a5fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% -10%, #12335a 0, transparent 32rem),
+        radial-gradient(circle at 95% 0%, #1c234d 0, transparent 28rem),
+        var(--bg);
+      font: 15px/1.65 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { width: min(1240px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 80px; }
+    h1 { margin: 0; font-size: clamp(28px, 4vw, 48px); line-height: 1.12; letter-spacing: -.04em; }
+    h2 { margin: 0 0 18px; font-size: 22px; letter-spacing: -.02em; }
+    h3 { margin: 0 0 12px; font-size: 16px; }
+    p { margin: 8px 0; }
+    .eyebrow { color: var(--cyan); font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .subtitle { max-width: 860px; margin-top: 18px; color: var(--muted); font-size: 17px; }
+    .hero { padding: 20px 0 30px; }
+    .grid { display: grid; gap: 16px; }
+    .summary { grid-template-columns: repeat(4, 1fr); margin: 24px 0; }
+    .two { grid-template-columns: 1fr 1fr; }
+    .card, section {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(17,35,58,.96), rgba(10,24,41,.96));
+      box-shadow: 0 18px 46px rgba(0,0,0,.18);
+    }
+    .card { padding: 20px; }
+    section { padding: 24px; margin-top: 18px; }
+    .metric-label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    .metric { margin: 5px 0 0; font-size: 31px; font-weight: 850; letter-spacing: -.04em; }
+    .metric small { color: var(--muted); font-size: 14px; font-weight: 600; }
+    .good { color: var(--green); }
+    .warn { color: var(--yellow); }
+    .bad { color: var(--red); }
+    .muted { color: var(--muted); }
+    .tag { display: inline-block; padding: 3px 9px; margin: 3px 4px 3px 0; border: 1px solid var(--line); border-radius: 999px; color: #bdd0e5; background: #0a1829; font-size: 12px; }
+    .callout { padding: 15px 17px; border-left: 4px solid var(--cyan); border-radius: 10px; background: rgba(50,213,255,.07); }
+    .callout.warnbox { border-left-color: var(--yellow); background: rgba(255,200,87,.07); }
+    .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 12px; align-items: center; }
+    .node { padding: 17px; border: 1px solid var(--line); border-radius: 13px; background: #0a1728; text-align: center; }
+    .node strong { display: block; font-size: 18px; }
+    .arrow { color: var(--cyan); font-size: 24px; }
+    .chart { min-height: 330px; width: 100%; overflow-x: auto; }
+    .chart svg { display: block; min-width: 680px; width: 100%; height: 330px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 5px 0 15px; color: var(--muted); font-size: 13px; }
+    .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; background: var(--c); }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+    tr:last-child td { border-bottom: 0; }
+    .table-wrap { overflow-x: auto; }
+    .heat { border-radius: 7px; font-weight: 750; }
+    .comparison { display: grid; grid-template-columns: 110px 1fr 1fr 100px; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .comparison:last-child { border-bottom: 0; }
+    .bar-track { position: relative; height: 26px; border-radius: 7px; background: #071421; overflow: hidden; }
+    .bar { height: 100%; border-radius: 7px; }
+    .bar-value { position: absolute; right: 8px; top: 2px; color: white; font-size: 13px; font-weight: 800; text-shadow: 0 1px 3px #000; }
+    .delta { text-align: right; font-weight: 800; }
+    .notes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .notes.four { grid-template-columns: repeat(4, 1fr); }
+    .note { padding: 16px; border-radius: 13px; background: #091727; border: 1px solid var(--line); }
+    .note strong { color: var(--cyan); }
+    .footer { margin-top: 24px; color: var(--muted); font-size: 12px; text-align: center; }
+    @media (max-width: 900px) {
+      .summary, .two, .notes, .notes.four { grid-template-columns: 1fr 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); text-align: center; }
+    }
+    @media (max-width: 620px) {
+      main { width: min(100% - 20px, 1240px); padding-top: 28px; }
+      .summary, .two, .notes, .notes.four { grid-template-columns: 1fr; }
+      section { padding: 17px; }
+      .comparison { grid-template-columns: 86px 1fr; }
+      .comparison .delta { grid-column: 2; text-align: left; }
+    }
+    @media print {
+      body { background: white; color: #122033; }
+      .card, section { background: white; box-shadow: none; border-color: #ccd6e0; break-inside: avoid; }
+      .muted, .subtitle, .metric-label, th, .legend { color: #52657a; }
+      main { width: 100%; padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="eyebrow">XDS · NVMe → NPU HBM</div>
+    <h1>单盘单卡 P2P Benchmark<br>数据分析报告</h1>
+    <p class="subtitle">聚焦两组实测数据：独立命令逐项运行，以及同一轮连续 sweep。所有带宽均为 runner 输出的 GiB/s；报告不把主动休眠和独立 full verification 的耗时计入带宽。</p>
+  </header>
+
+  <div class="grid summary">
+    <div class="card"><div class="metric-label">独立运行最高</div><div class="metric good">6.31 <small>GiB/s</small></div><div class="muted">512K · q1024 · 1G</div></div>
+    <div class="card"><div class="metric-label">连续运行最高</div><div class="metric">5.96 <small>GiB/s</small></div><div class="muted">128K · q1024 · 1G</div></div>
+    <div class="card"><div class="metric-label">PCIe x4 理论利用率</div><div class="metric good">86.0<small>%</small></div><div class="muted">6.31 / 7.34 GiB/s</div></div>
+    <div class="card"><div class="metric-label">建议性能甜点</div><div class="metric">5.98 <small>GiB/s</small></div><div class="muted">256K · q256，约为峰值 94.8%</div></div>
+  </div>
+
+  <section>
+    <h2>测试对象与链路上限</h2>
+    <div class="flow">
+      <div class="node"><span class="muted">源设备</span><strong>单 NVMe</strong>PCIe 4.0 x4 · 7.34 GiB/s</div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="muted">XDS 路径</span><strong>P2P Read</strong>绕过用户态 CPU 数据搬运</div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="muted">目标设备</span><strong>单 NPU HBM</strong>PCIe 4.0 x16 · 29.34 GiB/s</div>
+    </div>
+    <p class="callout">端到端硬上限取最窄链路，因此这里是 NVMe 的 PCIe 4.0 x4：<strong>7.34 GiB/s</strong>。6.31 GiB/s 已达到编码理论值的 86%；NPU x16 不是这组单盘数据的瓶颈。</p>
+  </section>
+
+  <section>
+    <h2>独立运行：请求变大后快速接近单盘上限</h2>
+    <div class="legend">
+      <span style="--c:#32d5ff">128K</span><span style="--c:#5be49b">256K</span><span style="--c:#ffc857">512K</span><span style="--c:#ff6b78">PCIe x4 理论 7.34</span>
+    </div>
+    <div id="singleChart" class="chart" aria-label="独立运行带宽折线图"></div>
+    <div class="grid two">
+      <div class="callout"><strong>最明显的收益来自请求粒度。</strong> 128K q256 为 5.09 GiB/s；256K q256 提升到 5.98 GiB/s，提升约 17.5%。</div>
+      <div class="callout warnbox"><strong>q512 后收益很小。</strong> 256K 从 q256 到 q1024 仅提高 1.0%；此时继续加深队列基本只增加压力。</div>
+    </div>
+    <div class="table-wrap" style="margin-top:18px">
+      <table>
+        <thead><tr><th>请求粒度</th><th>io_depth</th><th>扫描大小</th><th>带宽</th><th>x4 理论利用率</th></tr></thead>
+        <tbody id="singleRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>连续运行：完整参数矩阵</h2>
+    <p class="muted">颜色越亮表示带宽越高。连续数据使用相同的 1 GiB 扫描规模，并在同一轮进程中依次执行，组内对比比跨独立命令更整齐。</p>
+    <div class="table-wrap">
+      <table id="heatmap">
+        <thead><tr><th>请求粒度</th><th>q16</th><th>q32</th><th>q64</th><th>q128</th><th>q512</th><th>q1024</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="legend" style="margin-top:20px">
+      <span style="--c:#32d5ff">32K</span><span style="--c:#5be49b">64K</span><span style="--c:#ffc857">128K</span>
+    </div>
+    <div id="continuousChart" class="chart" aria-label="连续运行带宽折线图"></div>
+    <div class="notes">
+      <div class="note"><strong>32K</strong><br>q128 后已平台化，最高只有 1.62 GiB/s。继续提高深度没有形成稳定收益。</div>
+      <div class="note"><strong>64K</strong><br>从 q16 的 1.81 增长到 q1024 的 3.17 GiB/s，q512 后基本饱和。</div>
+      <div class="note"><strong>128K</strong><br>对深度最敏感，q1024 达到 5.96 GiB/s；q128 的 3.50 是明显异常低点。</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>连续执行时序：异常集中在 128K q128</h2>
+    <p class="muted">横轴按真实执行顺序排列：先跑完 32K 的各深度，再跑 64K，最后跑 128K。该图用于观察前序测试是否影响后续点。</p>
+    <div id="sequenceChart" class="chart" aria-label="连续测试执行时序图"></div>
+    <p class="callout warnbox">第 16 个点，即 <strong>128K q128</strong>，从前一点 3.96 降至 3.50 GiB/s（−11.6%），但后续 q512/q1024 又升至 5.52/5.96。因此它更像单点波动、状态变化或测试噪声，不能据一次结果认定 q128 本身更慢。</p>
+  </section>
+
+  <section>
+    <h2>相同参数的直接对比：连续运行并非整体变慢</h2>
+    <p class="muted">只有三个参数点能够直接重合。128K q64/q128 的独立数据使用 800M；q1024 两边都是 1G，因此前两项仍存在扫描规模与临时文件物理布局差异。</p>
+    <div id="comparisons"></div>
+    <p class="callout"><strong>核心判断：</strong>连续运行不是普遍性降速。q64 连续运行高 3.1%，q1024 高 1.0%；只有 q128 低 25.1%。所以现有数据更支持“连续矩阵中出现一个异常点”，而不是“连续运行导致所有性能下降”。</p>
+  </section>
+
+  <section>
+    <h2>小请求表现为约 50K requests/s 的软件路径上限</h2>
+    <p class="muted">对不超过 128K 的请求，带宽换算成 P2P 请求速率后，各粒度在高深度下都收敛到约 49K–53K requests/s。</p>
+    <div id="iopsChart" class="chart" aria-label="P2P 请求速率图"></div>
+    <p class="callout">这解释了为什么请求粒度近似翻倍时，带宽也接近翻倍：32K q1024 为 1.62 GiB/s、64K 为 3.17 GiB/s、128K 为 5.96 GiB/s，而每秒处理的 P2P 请求数变化不大。当前小请求更像受每请求的软件/驱动开销限制，而不是受 HBM 带宽限制。</p>
+  </section>
+
+  <section>
+    <h2>C++ 与 Python 测试对比：小粒度的软件开销显著</h2>
+    <p class="muted">C++ 数据来自 <code>tools/single_npu_stream_bench.cpp</code>。该脚本直接使用 ACL 和 file_p2p API，在原生循环中提交 <code>read_file</code> 并按 io_depth 调用 <code>drain_read</code>；相比 Python 测试，减少了 Python 解释器、对象构造及语言绑定等用户态开销。</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>请求粒度</th><th>io_depth</th><th>Python</th><th>C++</th><th>C++ 相对提升</th></tr></thead>
+        <tbody>
+          <tr><td>32K</td><td>128</td><td>1.60 GiB/s</td><td>2.25 GiB/s</td><td class="good">+40.6%</td></tr>
+          <tr><td>64K</td><td>128</td><td>2.79 GiB/s</td><td>3.79 GiB/s</td><td class="good">+35.8%</td></tr>
+          <tr><td>128K</td><td>128</td><td>3.50 GiB/s</td><td>5.06 GiB/s</td><td class="good">+44.6%</td></tr>
+          <tr><td>256K</td><td>1024</td><td>6.04 GiB/s</td><td>约 6.02 GiB/s</td><td>基本持平</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid two" style="margin-top:18px">
+      <div class="callout"><strong>小粒度下 C++ 快约 30%–50%。</strong> 请求越小，单位数据量需要的提交次数越多，Python 调度与绑定层的固定成本会被反复放大；改用原生 C++ 后，32K–128K 的 q128 带宽明显提高。</div>
+      <div class="callout warnbox"><strong>大粒度下收益很小。</strong> 256K q1024 时 C++ 约 6.02 GiB/s，与 Python 的 6.04 GiB/s 基本相同，说明此时性能已主要受 NVMe/PCIe 链路上限约束，继续降低语言层开销难以转化为带宽。</div>
+    </div>
+    <p class="muted">其中 Python 的 128K q128 是连续矩阵中的异常低点，因此该点的提升幅度不宜单独作为普遍结论；但 32K、64K 与 128K 的整体趋势一致，仍表明小请求场景存在较大的软件层固定开销。</p>
+  </section>
+
+  <section>
+    <h2>单次运行与连续运行：数据含义不同</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>维度</th><th>独立命令逐项运行</th><th>同一轮连续运行</th></tr></thead>
+        <tbody>
+          <tr><td>进程/runtime</td><td>每个命令重新启动 Python、torch_npu 与 CANN</td><td>所有组合共享同一进程/runtime</td></tr>
+          <tr><td>测试文件</td><td>每个命令重新创建临时文件，extent 可能不同</td><td>同一轮所有组合复用同一个临时文件</td></tr>
+          <tr><td>扫描大小</td><td>混有 800M 和 1G</td><td>统一为 1G</td></tr>
+          <tr><td>状态继承</td><td>进程退出形成更强隔离</td><td>可能继承 allocator cache、runtime 和设备热态</td></tr>
+          <tr><td>10 秒间隔</td><td>命令间自然有人工间隔</td><td>只在组合结束后休眠，不进入带宽计时</td></tr>
+          <tr><td>full verify</td><td colspan="2">每个 PASS 前会独立再读一遍完整文件；输出 bytes 仍只写计时 pass 的 800M/1G</td></tr>
+          <tr><td>适合回答</td><td>某个参数在“冷启动/独立进程”下能达到多少</td><td>参数矩阵在同文件、同进程条件下的相对趋势</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="callout warnbox">因此不能用“独立最高 6.31 vs 连续最高 5.96”直接得出连续运行慢 5.5%。独立最高使用 512K，而连续数据只展示到 128K；两边没有测试同一个最高参数组合。</p>
+  </section>
+
+  <section>
+    <h2>数据结论</h2>
+    <div class="notes four">
+      <div class="note"><strong>链路结论</strong><br>单盘最高 6.31 GiB/s，已接近 PCIe 4.0 x4 的实用上限。NPU x16 有大量余量。</div>
+      <div class="note"><strong>调参结论</strong><br>增大请求粒度比无限增加 io_depth 更有效。256K q256 已取得峰值的 94.8%。</div>
+      <div class="note"><strong>连续性结论</strong><br>连续运行整体趋势正常，没有系统性降速证据；128K q128 是应当复测的突出异常点。</div>
+      <div class="note"><strong>实现开销结论</strong><br>小粒度 q128 下 C++ 比 Python 快约 30%–50%，而 256K q1024 基本持平，说明软件固定开销主要影响小请求。</div>
+    </div>
+    <div style="margin-top:16px">
+      <span class="tag">建议每点重复 ≥3 次</span>
+      <span class="tag">报告中位数/P95</span>
+      <span class="tag">统一使用 1G 文件</span>
+      <span class="tag">补测连续 256K/512K</span>
+      <span class="tag">重点复测 128K q128</span>
+    </div>
+  </section>
+
+  <div class="footer">XDS benchmark data report · standalone HTML · no external dependencies</div>
+</main>
+
+<script>
+const theory = 7.34;
+const single = [
+  {size:'128K', q:64, bytes:'800M', bw:3.84},
+  {size:'128K', q:128, bytes:'800M', bw:4.67},
+  {size:'128K', q:256, bytes:'800M', bw:5.09},
+  {size:'256K', q:256, bytes:'800M', bw:5.98},
+  {size:'256K', q:512, bytes:'800M', bw:6.04},
+  {size:'256K', q:1024, bytes:'800M', bw:6.04},
+  {size:'512K', q:512, bytes:'800M', bw:6.10},
+  {size:'512K', q:1024, bytes:'800M', bw:6.25},
+  {size:'512K', q:1024, bytes:'1G', bw:6.31},
+  {size:'128K', q:1024, bytes:'1G', bw:5.90}
+];
+const qs = [16,32,64,128,512,1024];
+const continuous = {
+  '32K':[1.11,1.35,1.49,1.60,1.53,1.62],
+  '64K':[1.81,2.17,2.54,2.79,3.13,3.17],
+  '128K':[2.38,3.12,3.96,3.50,5.52,5.96]
+};
+const colors = {'32K':'#32d5ff','64K':'#5be49b','128K':'#ffc857','256K':'#5be49b','512K':'#ffc857'};
+
+function lineChart(target, series, xValues, options={}) {
+  const W=900,H=330,L=58,R=24,T=20,B=48, maxY=options.maxY||7.5;
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const add=(tag,attrs,text)=>{const e=document.createElementNS(svg.namespaceURI,tag);Object.entries(attrs||{}).forEach(([k,v])=>e.setAttribute(k,v));if(text!==undefined)e.textContent=text;svg.appendChild(e);return e};
+  const x=(v)=> options.indexed ? L+(W-L-R)*(v/(xValues.length-1)) : L+(W-L-R)*((Math.log2(v)-Math.log2(Math.min(...xValues)))/(Math.log2(Math.max(...xValues))-Math.log2(Math.min(...xValues))));
+  const y=(v)=>T+(H-T-B)*(1-v/maxY);
+  for(let v=0;v<=maxY;v+=1){add('line',{x1:L,y1:y(v),x2:W-R,y2:y(v),stroke:'#253b55','stroke-width':1});add('text',{x:L-9,y:y(v)+4,fill:'#91a6bd','font-size':11,'text-anchor':'end'},v.toFixed(0));}
+  xValues.forEach((v,i)=>{const px=options.indexed?x(i):x(v);add('line',{x1:px,y1:T,x2:px,y2:H-B,stroke:'#172b42','stroke-width':1});add('text',{x:px,y:H-19,fill:'#91a6bd','font-size':11,'text-anchor':'middle'},options.xLabels?options.xLabels[i]:`q${v}`)});
+  if(options.theory){add('line',{x1:L,y1:y(theory),x2:W-R,y2:y(theory),stroke:'#ff6b78','stroke-width':1.5,'stroke-dasharray':'7 6'});}
+  series.forEach(s=>{
+    const pts=s.data.map((d,i)=>`${options.indexed?x(i):x(d.x)},${y(d.y)}`).join(' ');
+    add('polyline',{points:pts,fill:'none',stroke:s.color,'stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round'});
+    s.data.forEach((d,i)=>{const px=options.indexed?x(i):x(d.x),py=y(d.y);add('circle',{cx:px,cy:py,r:d.alert?6:4.5,fill:d.alert?'#ff6b78':s.color,stroke:'#07111f','stroke-width':2});add('text',{x:px,y:py-10,fill:d.alert?'#ff9da5':'#dce8f5','font-size':11,'font-weight':700,'text-anchor':'middle'},d.y.toFixed(2));});
+  });
+  add('text',{x:16,y:H/2,fill:'#91a6bd','font-size':11,transform:`rotate(-90 16 ${H/2})`},options.yLabel||'GiB/s');
+  document.getElementById(target).appendChild(svg);
+}
+
+const singleSeries=['128K','256K','512K'].map(size=>({
+  color:colors[size],
+  data:single.filter(d=>d.size===size && !(size==='512K'&&d.q===1024&&d.bytes==='800M')).map(d=>({x:d.q,y:d.bw}))
+}));
+lineChart('singleChart',singleSeries,[64,128,256,512,1024],{theory:true,maxY:8});
+
+lineChart('continuousChart',Object.entries(continuous).map(([size,vals])=>({color:colors[size],data:vals.map((v,i)=>({x:qs[i],y:v,alert:size==='128K'&&qs[i]===128}))})),qs,{maxY:7});
+
+const sequence=[];
+Object.entries(continuous).forEach(([size,vals])=>vals.forEach((v,i)=>sequence.push({x:sequence.length,y:v,alert:size==='128K'&&qs[i]===128})));
+lineChart('sequenceChart',[{color:'#a78bfa',data:sequence}],sequence.map((_,i)=>i),{indexed:true,maxY:7,xLabels:sequence.map((_,i)=>`${Object.keys(continuous)[Math.floor(i/6)]}/${qs[i%6]}`)});
+
+document.getElementById('singleRows').innerHTML=single.map(d=>`<tr><td>${d.size}</td><td>${d.q}</td><td>${d.bytes}</td><td><strong>${d.bw.toFixed(2)} GiB/s</strong></td><td>${(d.bw/theory*100).toFixed(1)}%</td></tr>`).join('');
+
+const heatBody=document.querySelector('#heatmap tbody');
+Object.entries(continuous).forEach(([size,vals])=>{
+  const cells=vals.map(v=>{const t=v/6.31;const alpha=.12+.65*t;return `<td class="heat" style="background:rgba(50,213,255,${alpha.toFixed(2)})">${v.toFixed(2)}</td>`}).join('');
+  heatBody.insertAdjacentHTML('beforeend',`<tr><td><strong>${size}</strong></td>${cells}</tr>`);
+});
+
+const comparisons=[
+  {label:'128K · q64',a:3.84,b:3.96,note:'800M vs 1G'},
+  {label:'128K · q128',a:4.67,b:3.50,note:'800M vs 1G'},
+  {label:'128K · q1024',a:5.90,b:5.96,note:'1G vs 1G'}
+];
+document.getElementById('comparisons').innerHTML=`<div class="comparison muted"><div>参数</div><div>独立运行</div><div>连续运行</div><div>变化</div></div>`+comparisons.map(d=>{
+  const delta=(d.b/d.a-1)*100;
+  const cls=delta<-5?'bad':'good';
+  return `<div class="comparison"><div><strong>${d.label}</strong><br><small class="muted">${d.note}</small></div><div class="bar-track"><div class="bar" style="width:${d.a/theory*100}%;background:#32d5ff"></div><span class="bar-value">${d.a.toFixed(2)}</span></div><div class="bar-track"><div class="bar" style="width:${d.b/theory*100}%;background:#a78bfa"></div><span class="bar-value">${d.b.toFixed(2)}</span></div><div class="delta ${cls}">${delta>=0?'+':''}${delta.toFixed(1)}%</div></div>`;
+}).join('');
+
+const iopsSeries=Object.entries(continuous).map(([size,vals])=>{
+  const kib=parseInt(size);
+  return {color:colors[size],data:vals.map((bw,i)=>({x:qs[i],y:bw*1048576/kib/1000}))};
+});
+lineChart('iopsChart',iopsSeries,qs,{maxY:60,yLabel:'K requests/s'});
+</script>
+</body>
+</html>
