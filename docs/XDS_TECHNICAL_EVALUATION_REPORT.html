@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>XDS 技术评估与 Benchmark 分析报告</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #697386;
+      --line: #dfe4ec;
+      --paper: #ffffff;
+      --canvas: #f3f5f8;
+      --navy: #10233f;
+      --blue: #2367d1;
+      --blue-soft: #eaf2ff;
+      --cyan: #0d8a9c;
+      --green: #16835d;
+      --green-soft: #e8f6f0;
+      --amber: #a7610a;
+      --amber-soft: #fff3dc;
+      --red: #b33d48;
+      --red-soft: #fdecef;
+      --shadow: 0 14px 40px rgba(24, 38, 62, .08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font: 15px/1.72 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Microsoft YaHei", Arial, sans-serif;
+    }
+    a { color: inherit; }
+    .page { width: min(1180px, calc(100% - 40px)); margin: 30px auto 70px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 58px 64px 54px;
+      color: #fff;
+      background: linear-gradient(125deg, #0b1b34 0%, #12345f 62%, #0c6878 130%);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 440px;
+      height: 440px;
+      right: -180px;
+      top: -220px;
+      border: 74px solid rgba(255,255,255,.06);
+      border-radius: 50%;
+    }
+    .kicker { font-size: 12px; font-weight: 800; letter-spacing: .18em; color: #75d6e3; }
+    h1 { margin: 14px 0 13px; max-width: 800px; font-size: clamp(32px, 5vw, 54px); line-height: 1.13; letter-spacing: -.035em; }
+    .hero p { max-width: 830px; margin: 0; color: #cbd8e8; font-size: 17px; }
+    .scope-line { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+    .scope-line span { padding: 5px 11px; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; color: #e9f3ff; font-size: 12px; }
+    .layout { display: grid; grid-template-columns: 235px minmax(0, 1fr); gap: 28px; margin-top: 28px; align-items: start; }
+    nav { position: sticky; top: 18px; padding: 20px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+    nav strong { display: block; padding: 0 10px 10px; color: var(--muted); font-size: 11px; letter-spacing: .14em; }
+    nav a { display: block; padding: 8px 10px; text-decoration: none; border-radius: 8px; color: #3c485b; font-size: 13px; }
+    nav a:hover { color: var(--blue); background: var(--blue-soft); }
+    main { min-width: 0; }
+    section { margin-bottom: 22px; padding: 34px 38px; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+    section > :last-child { margin-bottom: 0; }
+    .section-no { margin-bottom: 5px; color: var(--blue); font-size: 11px; font-weight: 800; letter-spacing: .16em; }
+    h2 { margin: 0 0 18px; font-size: 26px; line-height: 1.3; letter-spacing: -.02em; }
+    h3 { margin: 27px 0 10px; font-size: 18px; }
+    p { margin: 10px 0; }
+    .lead { color: #354055; font-size: 16px; }
+    .muted { color: var(--muted); }
+    .grid { display: grid; gap: 14px; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .metric, .mini-card { padding: 19px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfe; }
+    .metric span { display: block; color: var(--muted); font-size: 12px; }
+    .metric strong { display: block; margin: 5px 0 1px; color: var(--navy); font-size: 28px; line-height: 1.2; }
+    .metric small { color: var(--muted); }
+    .verdict { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 18px; padding: 19px 21px; border-radius: 12px; margin: 14px 0; }
+    .verdict b { align-self: start; padding: 5px 8px; text-align: center; border-radius: 6px; font-size: 12px; }
+    .verdict p { margin: 0; }
+    .good-box { background: var(--green-soft); border-left: 4px solid var(--green); }
+    .good-box b { color: var(--green); background: #fff; }
+    .warn-box { background: var(--amber-soft); border-left: 4px solid var(--amber); }
+    .warn-box b { color: var(--amber); background: #fff; }
+    .risk-box { background: var(--red-soft); border-left: 4px solid var(--red); }
+    .risk-box b { color: var(--red); background: #fff; }
+    .info-box { background: var(--blue-soft); border-left: 4px solid var(--blue); }
+    .info-box b { color: var(--blue); background: #fff; }
+    .table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 11px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 11px 13px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: #4a566a; background: #f3f6fa; text-align: left; white-space: nowrap; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.best { color: var(--green); background: #f0faf5; font-weight: 800; }
+    code { padding: 2px 5px; color: #214f89; background: #edf3fb; border-radius: 4px; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .chain { display: grid; grid-template-columns: 1fr 34px 1fr 34px 1fr; align-items: stretch; gap: 8px; margin: 20px 0; }
+    .chain .node { padding: 18px; text-align: center; background: #f7f9fc; border: 1px solid var(--line); border-radius: 10px; }
+    .chain .node strong { display: block; margin: 3px 0; color: var(--navy); font-size: 17px; }
+    .chain .arrow { align-self: center; text-align: center; color: var(--blue); font-size: 20px; }
+    .bars { display: grid; gap: 11px; margin: 18px 0; }
+    .bar-row { display: grid; grid-template-columns: 105px minmax(150px, 1fr) 105px; gap: 11px; align-items: center; }
+    .bar-row label { font-size: 12px; font-weight: 700; }
+    .bar-track { height: 13px; overflow: hidden; background: #e9edf3; border-radius: 99px; }
+    .bar-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #276ed6, #14a0aa); }
+    .bar-value { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700; }
+    .legend { color: var(--muted); font-size: 12px; }
+    .risk-table td:first-child { white-space: nowrap; font-weight: 700; }
+    .priority { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--line); }
+    .priority:last-child { border-bottom: 0; }
+    .priority .n { width: 34px; height: 34px; display: grid; place-items: center; color: #fff; background: var(--navy); border-radius: 9px; font-weight: 800; }
+    .priority strong { display: block; margin-bottom: 3px; }
+    ul { margin: 9px 0; padding-left: 20px; }
+    li { margin: 6px 0; }
+    .conclusion { color: #fff; background: linear-gradient(125deg, #10233f, #16496f); border-color: transparent; }
+    .conclusion h2, .conclusion h3 { color: #fff; }
+    .conclusion p, .conclusion li { color: #dbe7f3; }
+    .conclusion .mini-card { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.07); }
+    .conclusion .mini-card strong { color: #81e2ca; }
+    footer { padding: 12px 6px; text-align: center; color: var(--muted); font-size: 12px; }
+    @media (max-width: 900px) {
+      .layout { display: block; }
+      nav { position: static; margin-bottom: 22px; }
+      nav a { display: inline-block; }
+      .grid-4, .grid-3 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 650px) {
+      .page { width: min(100% - 20px, 1180px); margin-top: 10px; }
+      .hero, section { padding: 26px 21px; border-radius: 13px; }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .chain { grid-template-columns: 1fr; }
+      .chain .arrow { transform: rotate(90deg); }
+      .verdict { grid-template-columns: 1fr; gap: 8px; }
+      .verdict b { justify-self: start; }
+      .bar-row { grid-template-columns: 78px minmax(100px, 1fr) 90px; }
+    }
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; margin: 0; }
+      .hero, section { box-shadow: none; break-inside: avoid; }
+      nav { display: none; }
+      .layout { display: block; }
+      section { margin: 12px 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header class="hero">
+    <div class="kicker">TECHNICAL ASSESSMENT · XDS</div>
+    <h1>XDS 技术评估与<br>Benchmark 分析报告</h1>
+    <p>公开仓库版本在 Linux 4.19.90、单 NVMe／单 NPU 环境下的能力、性能与风险评估</p>
+    <div class="scope-line">
+      <span>公开仓库版本</span><span>Linux 4.19.90</span><span>NVMe → NPU HBM</span><span>PCIe P2P Read</span><span>技术评估报告</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav aria-label="报告目录">
+      <strong>报告目录</strong>
+      <a href="#summary">01 · 执行摘要</a>
+      <a href="#scope">02 · 版本与能力边界</a>
+      <a href="#hardware">03 · 硬件环境与上限</a>
+      <a href="#method">04 · Benchmark 合理性</a>
+      <a href="#external">05 · 外部参考数据</a>
+      <a href="#local">06 · 本地实测数据</a>
+      <a href="#risks">07 · 代码与稳定性风险</a>
+      <a href="#constraints">08 · 当前使用约束</a>
+      <a href="#actions">09 · 后续建议</a>
+      <a href="#conclusion">10 · 最终结论</a>
+    </nav>
+
+    <main>
+      <section id="summary">
+        <div class="section-no">01 · EXECUTIVE SUMMARY</div>
+        <h2>执行摘要</h2>
+        <p class="lead">本次工作基于公开仓库 <code>mycastiel/xds</code> 开展，不以能力更完整的内网版本为基础。当前实际跑通并取得 benchmark 数据的环境是 Linux 4.19.90、单 NVMe、0 号 NPU 卡。</p>
+        <p class="lead">内网环境的 xds 库有更多适配功能，比如对linux 6.6.0的支持，多种存储设备的支持，多卡支持等等，由于其内部测试还未完成，本次测试只使用了 mycastiel/xds 仓库的功能。
+另外，4.19.90的机子 10.170.27.89 并没有实现多raid，实测仅有设备`/dev/nvme0n1`，挂载到了`workspace`，其他设备没有具体挂载点。因此在测试中仅使用了单卡单设备的场景。  </p>
+      </section>
+
+      <section id="scope">
+        <div class="section-no">02 · SCOPE &amp; LIMITS</div>
+        <h2>版本范围与能力边界</h2>
+        <div class="grid grid-2">
+          <div class="mini-card">
+            <h3 style="margin-top:0">本次评估对象</h3>
+            <ul>
+              <li>基于 GitHub 公开仓库 <code>mycastiel/xds</code> 开发。</li>
+              <li>以公开仓库 <code>origin/main</code> 的实现作为问题分析基线。</li>
+              <li>本地分支中虽有 Linux 6.6 兼容性修改，但仍属于适配与验证过程。</li>
+              <li>当前 benchmark 的实测运行内核为 Linux 4.19.90。</li>
+            </ul>
+          </div>
+          <div class="mini-card">
+            <h3 style="margin-top:0">与内网版本的差异</h3>
+            <ul>
+              <li>内网版本对 Linux 6.6.0 有更成熟的适配。</li>
+              <li>内网版本对多种存储设备有更多支持。</li>
+              <li>上述能力不能直接视为公开仓库版本已经具备。</li>
+              <li>公开版本当前应按 4.19.90、有限设备组合进行支持声明。</li>
+            </ul>
+          </div>
+        </div>
+        <h3>128 KiB 限制应如何理解</h3>
+        <p><code>origin/main</code> 中 <code>HW_LIMIT_SIZE = 128U &lt;&lt; 10</code> 限制的是<strong>单条底层 NVMe 命令</strong>，不是上层 P2P 请求的绝对最大值。256K、512K 等请求可以提交，但会在驱动内拆成多条不超过 128 KiB 的命令。</p>
+        <div class="verdict info-box"><b>影响</b><p>大粒度请求可以运行并取得较高吞吐，但拆分会增加命令数量、调度成本和页边界处理复杂度。因此报告不将其表述为“超过 128K 完全不能读”，而是“单条底层 I/O 上限为 128 KiB”。</p></div>
+        <h3>设备与多卡边界</h3>
+        <p>接口会传递 <code>devid/vfid</code>，但参数存在不等于功能已经验证。公开版本缺少多卡并发编排、拓扑检查、聚合吞吐统计和完整真机回归；本测试环境中非 0 卡读取未跑通，因此当前阶段按<strong>仅支持 0 号卡</strong>处理。</p>
+      </section>
+
+      <section id="hardware">
+        <div class="section-no">03 · HARDWARE ENVELOPE</div>
+        <h2>当前硬件环境与链路上限</h2>
+        <div class="chain" aria-label="数据链路">
+          <div class="node"><span class="muted">源设备</span><strong>单 NVMe</strong><small>PCIe 4.0 x4</small></div>
+          <div class="arrow">→</div>
+          <div class="node"><span class="muted">数据路径</span><strong>XDS P2P Read</strong><small>NVMe → NPU HBM</small></div>
+          <div class="arrow">→</div>
+          <div class="node"><span class="muted">目标设备</span><strong>单 NPU</strong><small>当前使用 0 号卡</small></div>
+        </div>
+        <div class="grid grid-3">
+          <div class="metric"><span><code>/proc/mdstat</code></span><strong>为空</strong><small>未发现活动的 Linux MD 软件 RAID</small></div>
+          <div class="metric"><span>NVMe 链路</span><strong>Gen4 x4</strong><small>编码理论上限约 7.34 GiB/s</small></div>
+          <div class="metric"><span>三盘 RAID 0</span><strong>22.02</strong><small>GiB/s · 理想聚合编码上限</small></div>
+        </div>
+        <p class="muted"><code>/proc/mdstat</code> 为空只能说明没有检测到 Linux MD 软件 RAID，不能单独排除硬件 RAID、设备侧 RAID 或其他卷管理方案。本报告按“当前无 MD RAID、单 NVMe 测试”分析。</p>
+        <h3>7.34 GiB/s 的来源</h3>
+        <p>PCIe 4.0 单 lane 速率为 16 GT/s，采用 128b/130b 编码。x4 链路的编码后带宽约为 <strong>7.34 GiB/s</strong>。这是链路编码上限，不是 SSD 必然能够持续达到的有效载荷吞吐；协议、控制器、队列和软件路径还会产生额外开销。</p>
+        <h3>RAID 0 可能带来的提升</h3>
+        <p>若三块 NVMe 组成 RAID 0，数据能够均匀条带化，并且三块盘、控制器与 PCIe 上行链路互不争用，则理论上限可从单盘 7.34 GiB/s 提升至约 <strong>22.02 GiB/s</strong>。实际值会受盘本身持续读能力、条带大小、RAID 实现、PCIe 拓扑、CPU/中断以及 XDS 多请求调度限制。</p>
+        <div class="verdict warn-box"><b>注意</b><p>RAID 0 提升的是源端并行带宽，不会自动解决非 0 卡读取、多卡调度、错误回传和稳定性问题，也不应在未测拓扑时直接按三倍性能承诺。</p></div>
+      </section>
+
+      <section id="method">
+        <div class="section-no">04 · BENCHMARK REVIEW</div>
+        <h2>Benchmark 是否合理</h2>
+        <p class="lead"><strong>总体设计合理，现有数据有明确参考价值。</strong>测试覆盖多种请求粒度和 io_depth，计时范围包含从 <code>read_file()</code> 提交到 <code>drain_read()</code> 完成的端到端 XDS 路径，并通过数据校验降低“只计时但没有正确传输”的风险。</p>
+        <div class="grid grid-2">
+          <div class="mini-card">
+            <h3 style="margin-top:0;color:var(--green)">合理之处</h3>
+            <ul>
+              <li>覆盖 32K–512K 请求粒度及多个队列深度。</li>
+              <li>区分独立命令与同进程连续 sweep。</li>
+              <li>记录实际传输字节和端到端带宽。</li>
+              <li>包含数据校验，并对 Python/C++ 实现做了对照。</li>
+              <li>能够识别小请求固定开销和队列饱和趋势。</li>
+            </ul>
+          </div>
+          <div class="mini-card">
+            <h3 style="margin-top:0;color:var(--amber)">正式验收前应补齐</h3>
+            <ul>
+              <li>每个参数至少重复 3–5 次，报告中位数、P95 和波动范围。</li>
+              <li>统一扫描大小、文件布局、预热策略和运行方式。</li>
+              <li>记录 SSD 温度、降频、PCIe 拓扑、CPU/IRQ 与系统日志。</li>
+              <li>修复 I/O 完成错误回传，确保 PASS 代表严格成功。</li>
+              <li>解决连续压力测试触发整机重启的问题。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="verdict info-box"><b>评价</b><p>当前 benchmark 足以支持“单盘性能水平、参数趋势和异常点定位”等技术判断；如果用于产品指标承诺或版本正式验收，则需要补齐重复性、环境控制和故障闭环。</p></div>
+      </section>
+
+      <section id="external">
+        <div class="section-no">05 · EXTERNAL REFERENCE</div>
+        <h2>外部参考：3 盘 RAID 0、8 卡读同一文件</h2>
+        <p>以下数据由外部测试提供。由于盘型、RAID 实现、条带大小、卡型、PCIe 拓扑、文件大小和统计方式未知，仅作为多盘多卡场景的趋势参考，不与本地单盘单卡结果做严格横向排名。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>读取粒度</th><th class="num">原始结果</th><th class="num">换算结果</th><th class="num">相对 32KB 提升</th></tr></thead>
+            <tbody>
+              <tr><td>32KB</td><td class="num">13.44 GB/s</td><td class="num">约 12.52 GiB/s</td><td class="num">基线</td></tr>
+              <tr><td>64KB</td><td class="num">14.92 GB/s</td><td class="num">约 13.90 GiB/s</td><td class="num">+11.0%</td></tr>
+              <tr><td>128KB</td><td class="num">16.56 GB/s</td><td class="num">约 15.42 GiB/s</td><td class="num">+23.2%</td></tr>
+              <tr><td>256KB</td><td class="num best">17.43 GB/s</td><td class="num best">约 16.23 GiB/s</td><td class="num best">+29.7%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="bars" aria-label="外部数据吞吐条形图">
+          <div class="bar-row"><label>32KB</label><div class="bar-track"><div class="bar-fill" style="width:77.1%"></div></div><div class="bar-value">13.44 GB/s</div></div>
+          <div class="bar-row"><label>64KB</label><div class="bar-track"><div class="bar-fill" style="width:85.6%"></div></div><div class="bar-value">14.92 GB/s</div></div>
+          <div class="bar-row"><label>128KB</label><div class="bar-track"><div class="bar-fill" style="width:95.0%"></div></div><div class="bar-value">16.56 GB/s</div></div>
+          <div class="bar-row"><label>256KB</label><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><div class="bar-value">17.43 GB/s</div></div>
+        </div>
+        <p class="legend">单位说明：外部数据保留原始 GB/s；本地 runner 输出为 GiB/s。1 GiB/s ≈ 1.074 GB/s。</p>
+        <div class="verdict good-box"><b>外部结论</b><p>在该 3 盘、8 卡场景中，增大读取粒度持续提升聚合吞吐，256KB 相比 32KB 提高约 29.7%。最高 17.43 GB/s（约 16.23 GiB/s）相当于三条 Gen4 x4 编码上限 22.02 GiB/s 的约 73.7%。这说明多盘并行能够有效突破单盘上限，但尚未达到理想线性扩展。</p></div>
+      </section>
+
+      <section id="local">
+        <div class="section-no">06 · LOCAL RESULTS</div>
+        <h2>本地单盘单卡实测数据</h2>
+        <h3>独立命令逐项运行</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>请求粒度</th><th class="num">io_depth</th><th class="num">扫描大小</th><th class="num">带宽</th><th class="num">链路利用率</th></tr></thead>
+            <tbody>
+              <tr><td>128K</td><td class="num">64</td><td class="num">800M</td><td class="num">3.84 GiB/s</td><td class="num">52.3%</td></tr>
+              <tr><td>128K</td><td class="num">128</td><td class="num">800M</td><td class="num">4.67 GiB/s</td><td class="num">63.6%</td></tr>
+              <tr><td>128K</td><td class="num">256</td><td class="num">800M</td><td class="num">5.09 GiB/s</td><td class="num">69.3%</td></tr>
+              <tr><td>128K</td><td class="num">1024</td><td class="num">1G</td><td class="num">5.90 GiB/s</td><td class="num">80.4%</td></tr>
+              <tr><td>256K</td><td class="num">256</td><td class="num">800M</td><td class="num">5.98 GiB/s</td><td class="num">81.5%</td></tr>
+              <tr><td>256K</td><td class="num">512</td><td class="num">800M</td><td class="num">6.04 GiB/s</td><td class="num">82.3%</td></tr>
+              <tr><td>256K</td><td class="num">1024</td><td class="num">800M</td><td class="num">6.04 GiB/s</td><td class="num">82.3%</td></tr>
+              <tr><td>512K</td><td class="num">512</td><td class="num">800M</td><td class="num">6.10 GiB/s</td><td class="num">83.1%</td></tr>
+              <tr><td>512K</td><td class="num">1024</td><td class="num">800M</td><td class="num">6.25 GiB/s</td><td class="num">85.1%</td></tr>
+              <tr><td>512K</td><td class="num">1024</td><td class="num">1G</td><td class="num best">6.31 GiB/s</td><td class="num best">86.0%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="grid grid-2">
+          <div class="verdict good-box"><b>粒度收益</b><p>同为 q256，128K 的 5.09 GiB/s 提升到 256K 的 5.98 GiB/s，增幅约 17.5%。增大请求粒度比无限增加队列深度更有效。</p></div>
+          <div class="verdict info-box"><b>队列饱和</b><p>256K 从 q256 到 q1024 只提高约 1.0%。q256 已取得最终峰值的 94.8%，继续加深队列主要增加系统压力。</p></div>
+        </div>
+
+        <h3>同一进程连续 sweep（1 GiB）</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>请求粒度</th><th class="num">q16</th><th class="num">q32</th><th class="num">q64</th><th class="num">q128</th><th class="num">q512</th><th class="num">q1024</th></tr></thead>
+            <tbody>
+              <tr><td><strong>32K</strong></td><td class="num">1.11</td><td class="num">1.35</td><td class="num">1.49</td><td class="num">1.60</td><td class="num">1.53</td><td class="num">1.62</td></tr>
+              <tr><td><strong>64K</strong></td><td class="num">1.81</td><td class="num">2.17</td><td class="num">2.54</td><td class="num">2.79</td><td class="num">3.13</td><td class="num">3.17</td></tr>
+              <tr><td><strong>128K</strong></td><td class="num">2.38</td><td class="num">3.12</td><td class="num">3.96</td><td class="num" style="color:var(--red);font-weight:800">3.50</td><td class="num">5.52</td><td class="num best">5.96</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="legend">表中单位均为 GiB/s。红色的 128K/q128 是突出异常点。</p>
+
+        <h3>C++ 与 Python：小粒度软件开销</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>请求粒度 / io_depth</th><th class="num">Python</th><th class="num">C++</th><th class="num">C++ 相对变化</th></tr></thead>
+            <tbody>
+              <tr><td>32K / q128</td><td class="num">1.60 GiB/s</td><td class="num">2.25 GiB/s</td><td class="num best">+40.6%</td></tr>
+              <tr><td>64K / q128</td><td class="num">2.79 GiB/s</td><td class="num">3.79 GiB/s</td><td class="num best">+35.8%</td></tr>
+              <tr><td>128K / q128</td><td class="num">3.50 GiB/s</td><td class="num">5.06 GiB/s</td><td class="num best">+44.6%</td></tr>
+              <tr><td>256K / q1024</td><td class="num">6.04 GiB/s</td><td class="num">约 6.02 GiB/s</td><td class="num">基本持平</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="verdict info-box"><b>数据结论</b><p>32K、64K、128K 在高深度下大致收敛到约 49K–53K requests/s，说明小请求主要受每请求固定开销限制。C++ 在小粒度下快约 30%–50%，而 256K 时与 Python 基本持平，进一步印证大粒度已经接近存储/PCIe 链路瓶颈。</p></div>
+        <div class="verdict warn-box"><b>异常点</b><p>连续 sweep 的 128K/q128 从 q64 的 3.96 GiB/s 降到 3.50 GiB/s，随后又升至 5.52/5.96 GiB/s。它更像单点波动、状态变化或测试噪声，应重复测试，不能据此认定 q128 固有更慢。</p></div>
+      </section>
+
+      <section id="risks">
+        <div class="section-no">07 · CODE &amp; STABILITY RISKS</div>
+        <h2>基于 <code>origin/main</code> 的代码与稳定性风险</h2>
+        <p>以下问题来自公开基线实现的源码分析。部分问题已在本地后续提交中出现修复尝试，但在进入正式支持范围前仍需由 OS/驱动团队评审并完成真机回归。</p>
+        <div class="table-wrap">
+          <table class="risk-table">
+            <thead><tr><th>级别</th><th>问题</th><th>代码机制与影响</th><th>建议验证</th></tr></thead>
+            <tbody>
+              <tr><td style="color:var(--red)">高</td><td>非页对齐 NPU 地址处理</td><td><code>get_pa_list()</code> 成功时返回页内偏移，但调用方将任何非 0 返回值当作错误；随后用户态又主要按负值判断失败。可能出现请求未正常提交、返回语义却不明确的情况。</td><td>覆盖 0、非 0 页内偏移及跨页地址，要求返回值和数据校验均正确。</td></tr>
+              <tr><td style="color:var(--red)">高</td><td>FIEMAP 首 extent 偏移计算</td><td>基线按 <code>file_offset % 4096</code> 调整物理地址，没有使用 <code>requested_offset - fe_logical</code>。当 FIEMAP 返回的首 extent 逻辑起点与假设不同时，可能读到错误物理位置。</td><td>测试非 0 文件偏移、extent 内偏移、4 KiB 边界和碎片文件。</td></tr>
+              <tr><td style="color:var(--red)">高</td><td>I/O 错误仍返回 0</td><td><code>p2p_drain_read()</code> 会累计 <code>err_cnt</code>，但函数末尾固定返回 0。上层可能把 NVMe 提交或完成失败误判为成功。</td><td>注入提交失败与完成状态错误，要求 benchmark 明确 FAIL 并返回负 errno。</td></tr>
+              <tr><td style="color:var(--red)">高</td><td>batch 边界索引</td><td><code>do_read_ios_batch()</code> 在 <code>idx++</code> 后直接访问 <code>addr_off[idx]</code>/<code>align_size[idx]</code>，缺少到达末尾后的边界判断，存在越界访问风险。</td><td>覆盖单元素、正好结束、跨页、多元素及最后一段边界。</td></tr>
+              <tr><td style="color:var(--amber)">中</td><td>FIEMAP 覆盖不足</td><td>extent 容量按请求大小估算，且只检查映射总量是否大于请求，没有严格拒绝映射不足。碎片、稀疏或 unwritten 文件可能导致不完整映射。</td><td>分页遍历 FIEMAP；拒绝洞、未写 extent 和覆盖不足；记录 extent 数。</td></tr>
+              <tr><td style="color:var(--amber)">中</td><td>batch 连续性假设</td><td>用户态按首请求的 offset 与 <code>首请求 size × 数量</code> 查询连续 FIEMAP，不能等价支持任意跳跃 offset 或不同 size 的通用批读。</td><td>明确 API 约束，或逐请求构建映射；拒绝不满足连续性的输入。</td></tr>
+              <tr><td style="color:var(--amber)">中</td><td>设备/namespace 假设</td><td>请求中使用固定 <code>nsid = 1</code>，存储和文件系统路径也依赖“FIEMAP + 单 bdev”假设，多 namespace、CoW 或多设备文件系统未验证。</td><td>建立设备矩阵，校验 namespace、bdev 与文件实际映射关系。</td></tr>
+              <tr><td style="color:var(--amber)">中</td><td>非 0 卡与多卡</td><td>接口携带设备编号，但当前环境非 0 卡读取未跑通，也没有多卡并发和拓扑回归。</td><td>逐卡功能测试，再进行同根端口/跨根端口的并发吞吐和隔离测试。</td></tr>
+              <tr><td style="color:var(--amber)">中</td><td>内核版本耦合</td><td>NVMe 请求分配、完成回调及 <code>blk_execute_rq_nowait()</code> 等接口随内核版本变化，Linux 6.6 适配不能只以“编译通过”视为完成。</td><td>由 OS 部门在 6.6.0 完成编译、加载、功能、错误注入和压力回归。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>连续压测触发整机重启</h3>
+        <div class="verdict risk-box"><b>高优先级</b><p>当前一次性运行完整 benchmark 压力矩阵可能直接触发整机重启，根因未知；把测试拆开、一次只运行一个参数组合时暂未出现问题。该现象是正式性能验收和长期运行前的阻塞项。</p></div>
+        <p>现有证据不足以将重启归因于 XDS 驱动、NVMe、NPU runtime、电源、散热或 watchdog 中的任何一项。定位时应保留上次启动的内核日志、pstore/ramoops、BMC SEL、电源与温度记录，并逐步增加 io_depth、并发卡数和持续时间，确定最小复现条件。</p>
+      </section>
+
+      <section id="constraints">
+        <div class="section-no">08 · CURRENT OPERATING ENVELOPE</div>
+        <h2>当前建议的临时使用约束</h2>
+        <p>在 Linux 6.6、多设备、多卡和稳定性问题完成闭环前，建议将公开版本的可用范围限制如下：</p>
+        <div class="grid grid-2">
+          <div class="mini-card"><strong>系统与设备</strong><ul><li>Linux 4.19.90；</li><li>0 号 NPU 卡；</li><li>单 NVMe、无 MD RAID；</li><li>已验证的 CANN/驱动/PyTorch 组合。</li></ul></div>
+          <div class="mini-card"><strong>文件与地址</strong><ul><li>普通、非稀疏且已完全分配的文件；</li><li>文件系统来源与指定 bdev 一致；</li><li>偏移和长度至少按 4 KiB 对齐；</li><li>优先使用顺序读和连续请求。</li></ul></div>
+          <div class="mini-card"><strong>请求参数</strong><ul><li>允许 256K/512K 上层请求；</li><li>明确底层单命令最大 128 KiB；</li><li>性能甜点优先从 256K/q256 起步；</li><li>避免无收益地持续增加 io_depth。</li></ul></div>
+          <div class="mini-card"><strong>运行与判定</strong><ul><li>一次运行一个 benchmark 组合；</li><li>保留数据校验，不只看带宽；</li><li>每次检查 dmesg、设备错误和重启记录；</li><li>出现错误或异常波动时不计为有效样本。</li></ul></div>
+        </div>
+      </section>
+
+      <section id="actions">
+        <div class="section-no">09 · RECOMMENDED ACTIONS</div>
+        <h2>后续建议与优先级</h2>
+        <div class="priority"><div class="n">1</div><div><strong>先完成 Linux 6.6.0 和错误闭环</strong>由 OS/驱动部门基于内网经验评审公开版本适配，完成 NVMe/blk-mq API 兼容、I/O 错误回传、对齐和 batch 边界修复，并通过真机压力回归。</div></div>
+        <div class="priority"><div class="n">2</div><div><strong>定位整机重启</strong>建立最小复现用例；采集 pstore/ramoops、BMC SEL、温度、功耗和内核日志；分别改变 io_depth、batch 间隔、持续时间和设备并发，区分软件缺陷与硬件保护。</div></div>
+        <div class="priority"><div class="n">3</div><div><strong>建立设备与拓扑支持矩阵</strong>覆盖不同 NVMe、namespace、ext4/XFS、RAID 0、0/非 0 卡、单卡/多卡，以及同根端口和跨根端口拓扑。未验证组合不进入支持声明。</div></div>
+        <div class="priority"><div class="n">4</div><div><strong>规范正式 benchmark</strong>统一 1 GiB 或更大的工作集、文件布局和预热方式；每点重复 3–5 次；报告中位数/P95、温度和错误状态；单点测试与连续稳定性测试分开执行。</div></div>
+        <div class="priority"><div class="n">5</div><div><strong>优化小粒度软件路径</strong>以 requests/s 而非只以 GB/s 定位 32K–128K 开销，优先评估 C++ 原生提交、批量接口正确化、减少重复 open/FIEMAP/ioctl 和降低 drain 频率。</div></div>
+        <div class="priority"><div class="n">6</div><div><strong>再评估多盘多卡性能</strong>功能与稳定性闭环后，测试 3 盘 RAID 0 与 8 卡并发，分别报告单卡、单盘、聚合吞吐及公平性，确认瓶颈位于 SSD、PCIe 上行、RAID、CPU 还是 XDS。</div></div>
+      </section>
+
+      <section id="conclusion" class="conclusion">
+        <div class="section-no" style="color:#75d6e3">10 · FINAL CONCLUSION</div>
+        <h2>最终结论</h2>
+        <p class="lead" style="color:#fff"><strong>公开版 XDS 已证明单 NVMe 到 0 号 NPU HBM 的 P2P 读取路径可以在 Linux 4.19.90 上获得较好的大粒度顺序读性能，但尚未达到可对 Linux 6.6、多设备、多卡和高压力稳定性作正式支持承诺的状态。</strong></p>
+        <div class="grid grid-2" style="margin-top:22px">
+          <div class="mini-card"><strong>性能</strong><p>单盘峰值 6.31 GiB/s，达到 Gen4 x4 编码上限的 86%，大粒度性能较好；256K/q256 已接近峰值，是当前更均衡的参数点。</p></div>
+          <div class="mini-card"><strong>优化空间</strong><p>32K–128K 仍受每请求软件开销限制，原生 C++ 可带来约 30%–50% 改善；继续盲目增加 io_depth 收益有限。</p></div>
+          <div class="mini-card"><strong>能力缺口</strong><p>当前仅 0 号卡跑通。非 0 卡、多卡并发、RAID 0 和多种存储设备尚未形成完整验证，不能直接对标外部 3 盘 8 卡结果。</p></div>
+          <div class="mini-card"><strong>首要任务</strong><p>先解决错误回传、对齐/batch 风险和整机重启，再由 OS/驱动部门完成 Linux 6.6.0 与设备矩阵验证，最后进入正式性能验收。</p></div>
+        </div>
+        <h3>一句话判断</h3>
+        <p><strong style="color:#81e2ca">单盘大粒度性能已经可观；小粒度仍需优化；多盘多卡能力和高压力稳定性是当前真正的短板。</strong></p>
+      </section>
+    </main>
+  </div>
+  <footer>XDS Technical Evaluation &amp; Benchmark Report · standalone HTML</footer>
+</div>
+</body>
+</html>
