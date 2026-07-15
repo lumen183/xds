@@ -316,7 +316,7 @@ source /usr/local/Ascend/ascend-toolkit/latest/set_env.sh
 python3 tools/single_npu_stream_bench.py \
   --bdev /dev/nvme0n1 --data-dir /mnt/nvme \
   --file-size 3G --size 32K,64K,128K --io-depth 4,8,16,32 \
-  --json stream-results.json
+  --verify sample --json stream-results.json
 ```
 
 `--file-size` 默认 `3G`，并指定一次扫描读取的总字节数；`--size` 是每个 P2P 请求的
@@ -328,9 +328,69 @@ python3 tools/single_npu_stream_bench.py \
 --io-depth 4,8,16,32,64,128
 ```
 
-默认会在每组扫描之后额外验证文件的首、中、尾三个样本；验证不计入带宽计时。使用
-`--no-verify` 可关闭它以只测性能。临时文件在脚本退出时删除；因此 `--data-dir` 必须位于
-`--bdev` 对应的本地文件系统，并有至少 `--file-size` 的可用空间。
+Python runner 使用 `splitmix64-v1` 生成与绝对文件位置相关的 64-bit little-endian 数据，
+避免旧的 `offset & 0xff` 数据每 256 B 重复、因而无法发现 4 KiB 错位或页交换的问题。
+`--pattern-seed` 接受十进制或 `0x` 开头的 unsigned 64-bit 值，默认使用固定 seed 以保证
+复现；pattern 名称和 seed 都写入 JSON。
+
+默认 `--verify sample` 会在每组计时扫描结束后运行一个独立、不计入带宽的校验 pass。
+它至少校验 `max(32, io-depth)` 个请求，强制包含首、中、尾请求，并对文件范围做可复现的
+分层抽样；可用 `--verify-samples N` 调整最小请求数。校验按被测 `io-depth` 批量提交，覆盖
+不同 destination slot。每批提交前用 canary 填充 NPU buffer，完成后逐字节比较，并检查
+短请求尾部和未使用 slot 未被意外覆盖。
+
+需要全量正确性检查时使用：
+
+```bash
+python3 tools/single_npu_stream_bench.py \
+  --bdev /dev/nvme0n1 --data-dir /mnt/nvme \
+  --file-size 3G --size 32K --io-depth 16 --verify full
+```
+
+`--verify full` 使用相同的 `request_size × io-depth` 布局重新读取并校验整个文件，会使该
+组合额外读取一次全部数据。`--verify` 不带参数仍兼容旧命令并等价于 `--verify sample`；
+`--no-verify` 完全关闭校验。sample/full 都是独立重读 pass，因此不会用 Host 拷贝和比较
+干扰计时扫描，但也不声称验证的是刚才那一次瞬态传输。JSON 的 `verify.scope` 会明确记录
+`independent-pass`，并记录校验请求数、批次数、字节数和耗时。
+
+临时文件在脚本退出时删除；因此 `--data-dir` 必须位于 `--bdev` 对应的本地文件系统，并有
+至少 `--offset + --file-size` 的可用空间。上述增强校验当前只在 Python runner 中实现。
+
+#### C++ 数据路径
+
+需要降低 Python 调用开销时，可使用数据扫描行为兼容的 C++ runner。它通过 Ascend ACL Runtime
+直接分配 NPU 内存，并直接链接 `file_p2p` C API；文件准备、FIEMAP 检查、顺序提交、
+`drain_read()` 和样本校验均在同一 C++ 进程中完成。先加载 CANN 环境，再用测试构建入口
+编译：
+
+```bash
+source /usr/local/Ascend/ascend-toolkit/latest/set_env.sh
+./build.sh -t build
+```
+
+该命令生成 `build/bin/single_npu_stream_bench`。若 ACL 头文件或 `libascendcl.so` 不可用，
+CMake 会直接报错；此 runner 不提供 mock fallback。基础扫描参数和 Python 版本兼容，但
+`--verify sample/full`、`--verify-samples`、`--pattern-seed`、SplitMix64 pattern 和批量
+canary 校验是 Python runner 专属功能，C++ runner 仍保留原有三点样本校验。运行示例：
+
+```bash
+./tools/xds.sh setup
+./build/bin/single_npu_stream_bench \
+  --bdev /dev/nvme0n1 --data-dir /mnt/nvme \
+  --file-size 3G --size 32K,64K,128K --io-depth 4,8,16,32 \
+  --json stream-results.json
+```
+
+C++ runner 只写测量结果。绘图独立由 Python 完成，输出与原 benchmark 相同布局的单文件
+HTML 报告：
+
+```bash
+python3 tools/plot_single_npu_stream_bench.py \
+  stream-results.json --output stream-results.html
+```
+
+省略 `--output` 时默认写到 JSON 同目录下的同名 `.html` 文件。Python runner 仍会在
+指定 `--json` 后自动生成 HTML，但内部复用同一个独立报告实现。
 
 ## 磁盘、文件系统与 FIEMAP
 

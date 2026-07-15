@@ -120,23 +120,74 @@ if(XDS_BUILD_TESTS)
     enable_testing()
 
     if(XDS_ASCEND)
+        enable_language(CXX)
         if(NOT XDS_BUILD_PYTHON)
             message(FATAL_ERROR "XDS_BUILD_TESTS requires XDS_BUILD_PYTHON for the Ascend backend")
         endif()
+
+        find_path(XDS_ACL_INCLUDE_DIR
+            NAMES acl/acl.h
+            HINTS ENV ASCEND_HOME_PATH
+            PATH_SUFFIXES include runtime/include
+        )
+        find_library(XDS_ASCENDCL_LIBRARY
+            NAMES ascendcl
+            HINTS ENV ASCEND_HOME_PATH
+            PATH_SUFFIXES lib64 runtime/lib64
+        )
+        if(NOT XDS_ACL_INCLUDE_DIR OR NOT XDS_ASCENDCL_LIBRARY)
+            message(FATAL_ERROR
+                "Ascend ACL development files were not found. Source the CANN "
+                "set_env.sh before running ./build.sh -t build.")
+        endif()
+
+        add_executable(single_npu_stream_bench
+            tools/single_npu_stream_bench.cpp
+            file_p2p/file_p2p_api.c
+        )
+        target_compile_features(single_npu_stream_bench PRIVATE cxx_std_17)
+        target_include_directories(single_npu_stream_bench PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/file_p2p"
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${XDS_ACL_INCLUDE_DIR}"
+        )
+        target_link_libraries(single_npu_stream_bench PRIVATE "${XDS_ASCENDCL_LIBRARY}")
+        set_target_properties(single_npu_stream_bench PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+        )
+
         add_test(
             NAME python_extension_smoke
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/real/test_import.py"
         )
-        set(XDS_TEST_NAME python_extension_smoke)
+        add_test(
+            NAME cpp_stream_bench_help
+            COMMAND single_npu_stream_bench --help
+        )
+        add_test(
+            NAME cpp_stream_bench_invalid_size
+            COMMAND single_npu_stream_bench --file-size 0
+        )
+        set_tests_properties(cpp_stream_bench_invalid_size PROPERTIES WILL_FAIL TRUE)
+        set(XDS_BACKEND_TESTS
+            python_extension_smoke
+            cpp_stream_bench_help
+            cpp_stream_bench_invalid_size
+        )
     else()
         add_test(
             NAME mock_file_p2p
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/mock/test_file_p2p.py"
         )
-        set(XDS_TEST_NAME mock_file_p2p)
+        set(XDS_BACKEND_TESTS mock_file_p2p)
     endif()
 
-    set_tests_properties(${XDS_TEST_NAME} PROPERTIES
+    add_test(
+        NAME stream_report
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_stream_report.py"
+    )
+
+    set_tests_properties(${XDS_BACKEND_TESTS} PROPERTIES
         ENVIRONMENT "PYTHONPATH=${XDS_PYTHON_OUTPUT_DIR}"
     )
 endif()

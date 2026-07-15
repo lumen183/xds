@@ -44,7 +44,7 @@ int new_p2p_fd(void)
     if (dev_fd < 0) {
         err = -errno;
         fprintf(stderr, "open /dev/p2p_device failed, errno: %d\n", err);
-        return -err;
+        return err;
     }
 
     return dev_fd;

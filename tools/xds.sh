@@ -99,7 +99,7 @@ PY
     [[ -f "$MODULE" ]] || die "module was not built: $MODULE"
     sign_module
     if ! lsmod | awk '$1 == "p2p_dev" { found=1 } END { exit !found }'; then
-        sudo insmod "$MODULE" "tp_nvme_setup_cmd_addr=0x${trace_addr}"
+         insmod "$MODULE" "tp_nvme_setup_cmd_addr=0x${trace_addr}"
     fi
     "$PYTHON" - <<'PY'
 import os
@@ -121,7 +121,7 @@ cleanup() {
     if command -v fuser >/dev/null && fuser -s /dev/p2p_device; then
         die "/dev/p2p_device is still in use; close the listed test processes before cleanup"
     fi
-    sudo rmmod p2p_dev || die "p2p_dev could not be unloaded (it may still be in use); refusing to force unload"
+     rmmod p2p_dev || die "p2p_dev could not be unloaded (it may still be in use); refusing to force unload"
     echo "PASS cleanup module=p2p_dev"
 }
 

@@ -17,7 +17,8 @@ Usage: ./build.sh [-X on|off] [-P] [-t build|run] [-i on|off]
   -X on|off     Select the Ascend backend (on by default).  "off" builds only
                  the file_p2p Python mock and never builds kernel modules.
   -P             Build the Python module for the selected backend.
-  -t build|run   Build tests only, or build then run tests.
+  -t build|run   Build test targets (including the C++ stream benchmark),
+                 or build then run tests.
   -i on|off      Preserve build artifacts for incremental builds (off by default).
 
 Environment:

@@ -6,10 +6,10 @@ P2P request-size and queue-depth combination.  This intentionally uses only
 the stable single-request file_p2p API.
 """
 import argparse
-import html
 import json
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -23,16 +23,37 @@ from tools.xds_test import (  # noqa: E402
     InputFile,
     TestFailure,
     check_result,
-    expected,
     log,
     parse_size,
     require_runtime,
-    verify,
 )
+from tools.plot_single_npu_stream_bench import report_html  # noqa: E402
 
 
 DEFAULT_SIZES = "32K,64K,128K,256K,512K,1M"
 DEFAULT_IO_DEPTHS = "4,8,16,32,64,128"
+DEFAULT_PATTERN_SEED = 0x58D5A17E20260715
+DEFAULT_VERIFY_SAMPLES = 32
+PATTERN_NAME = "splitmix64-v1"
+CANARY = 0xA5
+_MASK64 = (1 << 64) - 1
+_SPLITMIX_INCREMENT = 0x9E3779B97F4A7C15
+_SPLITMIX_MULTIPLIER_1 = 0xBF58476D1CE4E5B9
+_SPLITMIX_MULTIPLIER_2 = 0x94D049BB133111EB
+_PATTERN_CHUNK_SIZE = 8 * 1024 * 1024
+np = None
+
+
+def require_numpy():
+    """Load NumPy only for real runs so --help works before runtime setup."""
+    global np
+    if np is not None:
+        return
+    try:
+        import numpy as numpy_module
+    except ImportError as exc:
+        raise TestFailure("NumPy is required for stream pattern generation and verification") from exc
+    np = numpy_module
 
 
 def parse_size_list(value):
@@ -54,6 +75,119 @@ def parse_io_depth_list(value):
     if any(depth < 1 for depth in depths):
         raise argparse.ArgumentTypeError("io-depth values must be positive")
     return depths
+
+
+def parse_uint64(value):
+    try:
+        number = int(value, 0)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("value must be a decimal or 0x-prefixed integer") from exc
+    if number < 0 or number > _MASK64:
+        raise argparse.ArgumentTypeError("value must fit in an unsigned 64-bit integer")
+    return number
+
+
+def parse_positive_integer(value):
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("value must be a positive integer") from exc
+    if number < 1:
+        raise argparse.ArgumentTypeError("value must be a positive integer")
+    return number
+
+
+def splitmix64(value):
+    """Return one deterministic SplitMix64 output using unsigned arithmetic."""
+    value = (value + _SPLITMIX_INCREMENT) & _MASK64
+    value = ((value ^ (value >> 30)) * _SPLITMIX_MULTIPLIER_1) & _MASK64
+    value = ((value ^ (value >> 27)) * _SPLITMIX_MULTIPLIER_2) & _MASK64
+    return value ^ (value >> 31)
+
+
+def pattern_bytes(offset, size, seed):
+    """Generate a slice of the position-dependent splitmix64-v1 byte stream."""
+    if np is None:
+        raise RuntimeError("require_numpy() must be called before generating the stream pattern")
+    if offset < 0 or size < 0:
+        raise ValueError("pattern offset and size must be non-negative")
+    if size == 0:
+        return b""
+    first_word = offset // 8
+    prefix = offset % 8
+    word_count = (prefix + size + 7) // 8
+    words = np.arange(first_word, first_word + word_count, dtype=np.uint64)
+    words ^= np.uint64(seed)
+    words += np.uint64(_SPLITMIX_INCREMENT)
+    words = (words ^ (words >> np.uint64(30))) * np.uint64(_SPLITMIX_MULTIPLIER_1)
+    words = (words ^ (words >> np.uint64(27))) * np.uint64(_SPLITMIX_MULTIPLIER_2)
+    words ^= words >> np.uint64(31)
+    encoded = words.astype("<u8", copy=False).tobytes()
+    return encoded[prefix:prefix + size]
+
+
+def write_pattern_file(fd, size, seed):
+    position = 0
+    while position < size:
+        amount = min(_PATTERN_CHUNK_SIZE, size - position)
+        payload = memoryview(pattern_bytes(position, amount, seed))
+        while payload:
+            written = os.write(fd, payload)
+            if written == 0:
+                raise TestFailure("temporary pattern file write returned zero bytes")
+            payload = payload[written:]
+            position += written
+
+
+class StreamInputFile:
+    """Generate the stream-specific pattern while reusing shared file checks."""
+
+    def __init__(self, args, required_size):
+        self.path = None
+        self._checked = None
+        directory = Path(args.data_dir).resolve()
+        if not directory.is_dir():
+            raise TestFailure(f"--data-dir is not a directory: {directory}")
+        fd, name = tempfile.mkstemp(prefix="xds-stream-", suffix=".bin", dir=directory)
+        self.path = Path(name)
+        try:
+            log(
+                args,
+                "input.write",
+                f"path={self.path} bytes={required_size} pattern={PATTERN_NAME} "
+                f"pattern_seed=0x{args.pattern_seed:016x}",
+            )
+            try:
+                write_pattern_file(fd, required_size, args.pattern_seed)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+
+            original_file = args.file
+            args.file = self.path
+            try:
+                self._checked = InputFile(args, required_size)
+                self.path = self._checked.path
+            finally:
+                args.file = original_file
+        except Exception:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            self.close()
+            raise
+
+    def close(self):
+        if self._checked is not None:
+            self._checked.close()
+            self._checked = None
+        if self.path is not None:
+            try:
+                self.path.unlink()
+            except FileNotFoundError:
+                pass
+            self.path = None
 
 
 def stream_once(torch, file_p2p, fd, args, request_size, io_depth):
@@ -115,82 +249,185 @@ def stream_once(torch, file_p2p, fd, args, request_size, io_depth):
     return buffer, elapsed_ns
 
 
-def sample_offsets(offset, length, request_size):
-    """Return deterministic first/middle/last reads without duplicate offsets."""
-    sample_size = min(length, request_size)
-    end = offset + length
-    middle = offset + ((length // 2) // request_size) * request_size
-    candidates = (offset, middle, end - sample_size)
-    return sample_size, list(dict.fromkeys(candidates))
+def sample_request_indices(total_requests, target, seed, request_size, io_depth):
+    """Select reproducible, spatially stratified request indices."""
+    target = min(total_requests, max(target, io_depth, 3))
+    if target == total_requests:
+        return list(range(total_requests))
+
+    derived = splitmix64(seed ^ request_size ^ (io_depth << 32) ^ total_requests)
+    selected = {0, (total_requests - 1) // 2, total_requests - 1}
+    for stratum in range(target):
+        begin = stratum * total_requests // target
+        end = (stratum + 1) * total_requests // target
+        choice = begin + splitmix64(derived ^ stratum) % (end - begin)
+        selected.add(choice)
+
+    counter = 0
+    while len(selected) < target:
+        selected.add(splitmix64(derived ^ 0xD1B54A32D192ED03 ^ counter) % total_requests)
+        counter += 1
+
+    # Anchors can make the stratified set exceed target.  Keep them, then take
+    # a deterministic subset of the remaining stratified values.
+    anchors = {0, (total_requests - 1) // 2, total_requests - 1}
+    if len(selected) > target:
+        others = sorted(
+            selected - anchors,
+            key=lambda index: splitmix64(derived ^ 0x94D049BB133111EB ^ index),
+        )
+        selected = anchors | set(others[:target - len(anchors)])
+    return sorted(selected, key=lambda index: splitmix64(derived ^ 0xBF58476D1CE4E5B9 ^ index))
 
 
-def verify_samples(torch, file_p2p, fd, args, request_size):
-    """Verify three representative locations outside the measured stream pass."""
-    sample_size, offsets = sample_offsets(args.offset, args.file_size, request_size)
-    # The P2P driver builds NVMe SGLs from the NPU virtual address.  Use a
-    # page-aligned sub-buffer here so verification does not accidentally test
-    # the driver's handling of an address such as 0x...0200 instead of the
-    # actual read path.
-    raw_buffer = torch.empty(sample_size + 4095, dtype=torch.uint8, device=torch.device(f"npu:{args.devid}"))
-    raw_address = raw_buffer.data_ptr()
-    aligned_offset = (-raw_address) & 0xFFF
-    buffer = raw_buffer[aligned_offset:aligned_offset + sample_size]
+def _raise_data_mismatch(args, mode, batch_index, slot, request_index, request_size,
+                         file_offset, address, actual, wanted):
+    actual_array = np.frombuffer(actual, dtype=np.uint8)
+    wanted_array = np.frombuffer(wanted, dtype=np.uint8)
+    differing = np.flatnonzero(actual_array != wanted_array)
+    first = int(differing[0])
+    window_start = max(0, first - 8)
+    window_end = min(len(actual), first + 8)
+    diagnostic = (
+        f"data verification failed: mode={mode} batch={batch_index} slot={slot} "
+        f"request_index={request_index} request_size={request_size} file_offset={file_offset} "
+        f"first_index={first} first_file_offset={file_offset + first} "
+        f"device_address=0x{address + first:x} mismatch_count={len(differing)} "
+        f"window=[{window_start},{window_end}) "
+        f"actual_window=0x{actual[window_start:window_end].hex()} "
+        f"expected_window=0x{wanted[window_start:window_end].hex()} "
+        f"pattern={PATTERN_NAME} pattern_seed=0x{args.pattern_seed:016x}"
+    )
+    print(f"DEBUG phase=verify.mismatch {diagnostic}", file=sys.stderr, flush=True)
+    raise TestFailure(diagnostic)
+
+
+def _check_canary(args, mode, batch_index, label, region, device_address):
+    changed = np.flatnonzero(region != CANARY)
+    if not len(changed):
+        return
+    first = int(changed[0])
+    diagnostic = (
+        f"verification boundary overwritten: mode={mode} batch={batch_index} region={label} "
+        f"first_index={first} device_address=0x{device_address + first:x} "
+        f"actual=0x{int(region[first]):02x} expected_canary=0x{CANARY:02x} "
+        f"changed_bytes={len(changed)} pattern={PATTERN_NAME} "
+        f"pattern_seed=0x{args.pattern_seed:016x}"
+    )
+    print(f"DEBUG phase=verify.boundary {diagnostic}", file=sys.stderr, flush=True)
+    raise TestFailure(diagnostic)
+
+
+def verify_pass(torch, file_p2p, fd, args, request_size, io_depth):
+    """Run an untimed-for-bandwidth independent sample or full verification pass."""
+    total_requests = (args.file_size + request_size - 1) // request_size
+    if args.verify_mode == "full":
+        request_indices = range(total_requests)
+    else:
+        request_indices = sample_request_indices(
+            total_requests,
+            args.verify_samples,
+            args.pattern_seed,
+            request_size,
+            io_depth,
+        )
+
+    started = time.perf_counter_ns()
+    buffer_size = request_size * io_depth
+    buffer = torch.empty(buffer_size, dtype=torch.uint8, device=torch.device(f"npu:{args.devid}"))
     address = buffer.data_ptr()
     log(
         args,
         "verify.alloc",
-        f"sample_size={sample_size} raw_address=0x{raw_address:x} "
-        f"aligned_offset={aligned_offset} aligned_address=0x{address:x} "
-        f"alignment={address & 0xFFF}",
+        f"mode={args.verify_mode} size={request_size} io_depth={io_depth} "
+        f"buffer_bytes={buffer_size} addr=0x{address:x} alignment={address & 0xFFF}",
     )
-    if address & 0xFFF:
-        raise TestFailure(f"failed to create 4KiB-aligned verification buffer: address=0x{address:x}")
-    for offset in offsets:
+    verified_requests = 0
+    verified_bytes = 0
+    batches = 0
+    for start in range(0, len(request_indices), io_depth):
+        batch = request_indices[start:start + io_depth]
+        buffer.fill_(CANARY)
+        torch.npu.synchronize()
+        for slot, request_index in enumerate(batch):
+            file_offset = args.offset + request_index * request_size
+            length = min(request_size, args.offset + args.file_size - file_offset)
+            check_result(
+                "read_file",
+                file_p2p.read_file(
+                    fd,
+                    str(args.input.path),
+                    args.bdev,
+                    file_offset,
+                    address + slot * request_size,
+                    length,
+                    args.devid,
+                    args.vfid,
+                ),
+            )
         log(
             args,
-            "verify.submit",
-            f"file_offset={offset} device_address=0x{address:x} length={sample_size}",
+            "verify.batch",
+            f"mode={args.verify_mode} batch={batches} requests={len(batch)}",
         )
-        check_result(
-            "read_file",
-            file_p2p.read_file(fd, str(args.input.path), args.bdev, offset, address, sample_size, args.devid, args.vfid),
-        )
-        log(args, "verify.drain", f"file_offset={offset}")
         check_result("drain_read", file_p2p.drain_read(fd))
         torch.npu.synchronize()
-        actual = buffer[:sample_size].cpu().numpy().tobytes()
-        wanted = expected(offset, sample_size)
-        if actual != wanted:
-            first = next((index for index, (got, want) in enumerate(zip(actual, wanted)) if got != want), None)
-            if first is None:
-                first = min(len(actual), len(wanted))
-            mismatch_count = sum(got != want for got, want in zip(actual, wanted))
-            window_start = max(0, first - 8)
-            window_end = min(sample_size, first + 8)
-            diagnostic = (
-                f"data verification failed: sample_offset={offset} sample_size={sample_size} "
-                f"request_size={request_size} first_index={first} first_file_offset={offset + first} "
-                f"device_address=0x{address + first:x} mismatch_count={mismatch_count} "
-                f"window=[{window_start},{window_end}) "
-                f"actual_window=0x{actual[window_start:window_end].hex()} "
-                f"expected_window=0x{wanted[window_start:window_end].hex()} "
-                f"actual_head=0x{actual[:32].hex()} expected_head=0x{wanted[:32].hex()} "
-                f"actual_tail=0x{actual[-32:].hex()} expected_tail=0x{wanted[-32:].hex()}"
-            )
-            # Keep this visible even without --verbose: the old verify() error
-            # only exposed the first differing byte and hid whether the whole
-            # sample was stale, zero-filled, shifted, or partially transferred.
-            print(f"DEBUG phase=verify.mismatch {diagnostic}", file=sys.stderr, flush=True)
-            raise TestFailure(diagnostic)
-        else:
-            log(
+        actual_batch = buffer.cpu().numpy()
+        for slot, request_index in enumerate(batch):
+            file_offset = args.offset + request_index * request_size
+            length = min(request_size, args.offset + args.file_size - file_offset)
+            slot_start = slot * request_size
+            actual = actual_batch[slot_start:slot_start + length].tobytes()
+            wanted = pattern_bytes(file_offset, length, args.pattern_seed)
+            if actual != wanted:
+                _raise_data_mismatch(
+                    args,
+                    args.verify_mode,
+                    batches,
+                    slot,
+                    request_index,
+                    request_size,
+                    file_offset,
+                    address + slot_start,
+                    actual,
+                    wanted,
+                )
+            if length < request_size:
+                tail = actual_batch[slot_start + length:slot_start + request_size]
+                _check_canary(
+                    args,
+                    args.verify_mode,
+                    batches,
+                    f"slot-{slot}-short-request-tail",
+                    tail,
+                    address + slot_start + length,
+                )
+            verified_requests += 1
+            verified_bytes += length
+        unused_start = len(batch) * request_size
+        if unused_start < buffer_size:
+            _check_canary(
                 args,
-                "verify.ok",
-                f"file_offset={offset} length={sample_size} "
-                f"head={actual[:16].hex()} tail={actual[-16:].hex()}",
+                args.verify_mode,
+                batches,
+                "unused-slots",
+                actual_batch[unused_start:],
+                address + unused_start,
             )
-        verify(torch, buffer, offset, sample_size)
-    return {"enabled": True, "status": "ok", "samples": len(offsets), "sample_size": sample_size}
+        batches += 1
+
+    return {
+        "enabled": True,
+        "status": "ok",
+        "mode": args.verify_mode,
+        "scope": "independent-pass",
+        "pattern": PATTERN_NAME,
+        "pattern_seed": f"0x{args.pattern_seed:016x}",
+        "requests": verified_requests,
+        "batches": batches,
+        "bytes": verified_bytes,
+        "elapsed_ns": time.perf_counter_ns() - started,
+    }
 
 
 def log_host_file_samples(args):
@@ -203,8 +440,8 @@ def log_host_file_samples(args):
         tail = os.pread(fd, sample_size, tail_offset)
     finally:
         os.close(fd)
-    expected_head = expected(args.offset, sample_size)
-    expected_tail = expected(tail_offset, sample_size)
+    expected_head = pattern_bytes(args.offset, sample_size, args.pattern_seed)
+    expected_tail = pattern_bytes(tail_offset, sample_size, args.pattern_seed)
     log(
         args,
         "input.sample",
@@ -213,131 +450,13 @@ def log_host_file_samples(args):
         f"head=0x{head.hex()} expected_head=0x{expected_head.hex()} "
         f"tail=0x{tail.hex()} expected_tail=0x{expected_tail.hex()}",
     )
-
-
-def _gib(value):
-    return f"{value / 1024 ** 3:.2f}"
-
-
-def _size_label(value):
-    return f"{value / 1024 ** 2:g}M" if value >= 1024 ** 2 else f"{value / 1024:g}K"
-
-
-def _heatmap_svg(rows, sizes, depths):
-    cell_w, cell_h, left, top = 86, 48, 72, 32
-    width = left + len(depths) * cell_w + 12
-    height = top + len(sizes) * cell_h + 50
-    maximum = max((row["bandwidth_bytes_per_sec"] for row in rows), default=1)
-    lookup = {(row["size"], row["io_depth"]): row for row in rows}
-    parts = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Throughput heatmap">']
-    parts.append(f'<text x="{left}" y="16" fill="#aab7ce">I/O depth</text>')
-    for x, depth in enumerate(depths):
-        parts.append(f'<text x="{left + x * cell_w + cell_w / 2}" y="24" fill="#aab7ce" text-anchor="middle">{depth}</text>')
-    for y, size in enumerate(sizes):
-        py = top + y * cell_h
-        parts.append(f'<text x="{left - 9}" y="{py + cell_h / 2 + 4}" fill="#aab7ce" text-anchor="end">{_size_label(size)}</text>')
-        for x, depth in enumerate(depths):
-            row = lookup.get((size, depth))
-            if row is None:
-                continue
-            fraction = row["bandwidth_bytes_per_sec"] / maximum
-            color = f"hsl({220 - fraction * 170:.1f}, 78%, {23 + fraction * 31:.1f}%)"
-            px = left + x * cell_w
-            label = f"size={_size_label(size)}, io-depth={depth}: {_gib(row['bandwidth_bytes_per_sec'])} GiB/s"
-            parts.append(f'<rect x="{px}" y="{py}" width="{cell_w - 3}" height="{cell_h - 3}" rx="4" fill="{color}"><title>{html.escape(label)}</title></rect>')
-            parts.append(f'<text x="{px + (cell_w - 3) / 2}" y="{py + 28}" fill="white" font-size="12" text-anchor="middle">{_gib(row["bandwidth_bytes_per_sec"])}</text>')
-    parts.append("</svg>")
-    return "".join(parts)
-
-
-def _line_chart_svg(rows, sizes, depths):
-    width, height, left, right, top, bottom = 650, 390, 65, 16, 20, 48
-    maximum = max((row["bandwidth_bytes_per_sec"] for row in rows), default=1) / 1024 ** 3 * 1.1
-    x = lambda index: left + index * (width - left - right) / max(len(depths) - 1, 1)
-    y = lambda value: top + (maximum - value) * (height - top - bottom) / maximum
-    colors = ["#6ba8ff", "#71dc9c", "#ffba69", "#d595ff", "#51d6d6", "#ff7d9a", "#d8d870"]
-    lookup = {(row["size"], row["io_depth"]): row for row in rows}
-    parts = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Throughput line chart">']
-    for tick in range(5):
-        value = maximum * tick / 4
-        py = y(value)
-        parts.append(f'<line x1="{left}" x2="{width - right}" y1="{py:.1f}" y2="{py:.1f}" stroke="#2b3a53"/>')
-        parts.append(f'<text x="{left - 8}" y="{py + 4:.1f}" fill="#aab7ce" text-anchor="end" font-size="12">{value:.1f}</text>')
-    for index, depth in enumerate(depths):
-        parts.append(f'<text x="{x(index):.1f}" y="{height - 22}" fill="#aab7ce" text-anchor="middle">{depth}</text>')
-    parts.append(f'<text x="{width / 2}" y="{height - 5}" fill="#aab7ce" text-anchor="middle">I/O depth</text>')
-    for series, size in enumerate(sizes):
-        values = [lookup[(size, depth)]["bandwidth_bytes_per_sec"] / 1024 ** 3 for depth in depths if (size, depth) in lookup]
-        points = " ".join(f"{x(index):.1f},{y(value):.1f}" for index, value in enumerate(values))
-        color = colors[series % len(colors)]
-        parts.append(f'<polyline points="{points}" fill="none" stroke="{color}" stroke-width="2.5"><title>{_size_label(size)}</title></polyline>')
-        for index, value in enumerate(values):
-            parts.append(f'<circle cx="{x(index):.1f}" cy="{y(value):.1f}" r="3" fill="{color}"><title>{_size_label(size)}, depth={depths[index]}: {value:.2f} GiB/s</title></circle>')
-    for index, size in enumerate(sizes):
-        lx, ly = left + (index % 3) * 110, top + (index // 3) * 18
-        color = colors[index % len(colors)]
-        parts.append(f'<rect x="{lx}" y="{ly}" width="10" height="10" fill="{color}"/><text x="{lx + 15}" y="{ly + 10}" fill="#dfe7f5" font-size="12">{_size_label(size)}</text>')
-    parts.append("</svg>")
-    return "".join(parts)
-
-
-def _results_table(rows):
-    body = []
-    for row in rows:
-        status = html.escape(str(row["verify"]["status"]))
-        body.append(
-            f'<tr><td>{_size_label(row["size"])}</td><td>{row["io_depth"]}</td>'
-            f'<td>{row["bytes"]:,}</td><td>{row["elapsed_ns"] / 1e9:.3f} s</td>'
-            f'<td>{_gib(row["bandwidth_bytes_per_sec"])} GiB/s</td>'
-            f'<td class="{"ok" if status == "ok" else "skip"}">{status}</td></tr>'
+    if head != expected_head or tail != expected_tail:
+        raise TestFailure(
+            f"generated input pattern verification failed: path={args.input.path} "
+            f"head_match={head == expected_head} tail_offset={tail_offset} "
+            f"tail_match={tail == expected_tail} pattern={PATTERN_NAME} "
+            f"pattern_seed=0x{args.pattern_seed:016x}"
         )
-    return "".join(body)
-
-
-def report_html(payload):
-    """Render a self-contained HTML report without requiring browser JavaScript."""
-    rows = payload["results"]
-    sizes = sorted({row["size"] for row in rows})
-    depths = sorted({row["io_depth"] for row in rows})
-    best = payload["best"]
-    meta = f"file size: {_gib(payload['file_size'])} GiB · {len(rows)} parameter combinations"
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>XDS single-NPU stream benchmark</title>
-<style>
-  :root {{ color-scheme: dark; font-family: system-ui, sans-serif; background: #10151f; color: #e8edf7; }}
-  body {{ max-width: 1280px; margin: 0 auto; padding: 28px; }}
-  h1 {{ margin: 0 0 6px; }} .muted {{ color: #aab7ce; }}
-  .cards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 22px 0; }}
-  .card, .panel {{ background: #182131; border: 1px solid #2b3a53; border-radius: 10px; padding: 16px; }}
-  .card strong {{ display: block; font-size: 1.35rem; margin-top: 5px; }}
-  .panels {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 16px; }}
-  .panel {{ overflow-x: auto; }} svg {{ min-width: 480px; max-width: 100%; height: auto; display: block; }}
-  table {{ width: 100%; border-collapse: collapse; margin-top: 16px; }}
-  th, td {{ border-bottom: 1px solid #2b3a53; padding: 9px; text-align: right; }} th:first-child, td:first-child {{ text-align: left; }}
-  th {{ color: #aab7ce; }} .ok {{ color: #70dc9b; }} .skip {{ color: #ffcf70; }}
-</style>
-</head>
-<body>
-<h1>XDS single-NPU stream benchmark</h1>
-<div class="muted">{html.escape(meta)}</div>
-<section class="cards">
-  <div class="card"><span class="muted">Best throughput</span><strong>{_gib(best['bandwidth_bytes_per_sec'])} GiB/s</strong></div>
-  <div class="card"><span class="muted">Best request size</span><strong>{_size_label(best['size'])}</strong></div>
-  <div class="card"><span class="muted">Best I/O depth</span><strong>{best['io_depth']}</strong></div>
-  <div class="card"><span class="muted">Verification</span><strong>{html.escape(str(best['verify']['status']))}</strong></div>
-</section>
-<section class="panels">
-  <div class="panel"><h2>Throughput heatmap</h2>{_heatmap_svg(rows, sizes, depths)}</div>
-  <div class="panel"><h2>Throughput by I/O depth</h2>{_line_chart_svg(rows, sizes, depths)}</div>
-</section>
-<section class="panel" style="margin-top:16px"><h2>All results</h2><table><thead><tr><th>Size</th><th>I/O depth</th><th>Bytes</th><th>Elapsed</th><th>Throughput</th><th>Verify</th></tr></thead><tbody>{_results_table(rows)}</tbody></table></section>
-</body>
-</html>
-"""
 
 
 def run(args):
@@ -347,10 +466,13 @@ def run(args):
         "run.start",
         f"bdev={args.bdev} data_dir={args.data_dir} file_size={args.file_size} "
         f"sizes={args.sizes} io_depths={args.io_depths} offset={args.offset} "
-        f"devid={args.devid} vfid={args.vfid} verify={args.verify}",
+        f"devid={args.devid} vfid={args.vfid} verify_mode={args.verify_mode} "
+        f"verify_samples={args.verify_samples} pattern={PATTERN_NAME} "
+        f"pattern_seed=0x{args.pattern_seed:016x}",
     )
     torch, file_p2p = require_runtime(args)
-    args.input = InputFile(args, args.offset + args.file_size)
+    require_numpy()
+    args.input = StreamInputFile(args, args.offset + args.file_size)
     log_host_file_samples(args)
     fd = None
     try:
@@ -362,10 +484,13 @@ def run(args):
             for io_depth in args.io_depths:
                 buffer, elapsed_ns = stream_once(torch, file_p2p, fd, args, request_size, io_depth)
                 bandwidth = args.file_size * 1_000_000_000 / elapsed_ns if elapsed_ns else 0
+                # The measured pass is fully drained; release its destination
+                # before allocating the independent verification-pass buffer.
+                del buffer
                 verification = (
-                    verify_samples(torch, file_p2p, fd, args, request_size)
-                    if args.verify
-                    else {"enabled": False, "status": "skipped"}
+                    verify_pass(torch, file_p2p, fd, args, request_size, io_depth)
+                    if args.verify_mode != "none"
+                    else {"enabled": False, "status": "skipped", "mode": "none"}
                 )
                 result = {
                     "status": "PASS",
@@ -389,15 +514,20 @@ def run(args):
                     f"bandwidth={bandwidth / 1024**3:.2f}GiB/s verify={verification['status']}",
                     flush=True,
                 )
-                # Keep this reference alive through drain and optional validation.
-                del buffer
         best = max(results, key=lambda item: item["bandwidth_bytes_per_sec"])
         print(
             f"BEST size={best['size']}B io_depth={best['io_depth']} "
             f"bandwidth={best['bandwidth_bytes_per_sec'] / 1024**3:.2f}GiB/s",
             flush=True,
         )
-        payload = {"status": "PASS", "file_size": args.file_size, "results": results, "best": best}
+        payload = {
+            "status": "PASS",
+            "file_size": args.file_size,
+            "pattern": PATTERN_NAME,
+            "pattern_seed": f"0x{args.pattern_seed:016x}",
+            "results": results,
+            "best": best,
+        }
         if args.json:
             json_path = Path(args.json)
             json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -421,8 +551,34 @@ def parser():
     root.add_argument("--offset", type=int, default=0, help="file offset at which the stream starts (default: 0)")
     root.add_argument("--devid", type=int, default=0, help="Ascend NPU device id (default: 0)")
     root.add_argument("--vfid", type=int, default=0, help="Ascend virtual device id (default: 0)")
-    root.add_argument("--verify", action="store_true", default=True, help="verify first/middle/last samples after each scan (default)")
-    root.add_argument("--no-verify", dest="verify", action="store_false", help="skip post-scan sample verification")
+    root.add_argument(
+        "--verify",
+        dest="verify_mode",
+        nargs="?",
+        choices=("sample", "full"),
+        const="sample",
+        default="sample",
+        help="run an independent sample or full verification pass (default: sample)",
+    )
+    root.add_argument(
+        "--no-verify",
+        dest="verify_mode",
+        action="store_const",
+        const="none",
+        help="skip the post-scan verification pass",
+    )
+    root.add_argument(
+        "--verify-samples",
+        type=parse_positive_integer,
+        default=DEFAULT_VERIFY_SAMPLES,
+        help=f"minimum requests checked in sample mode (default: {DEFAULT_VERIFY_SAMPLES}; never less than io-depth)",
+    )
+    root.add_argument(
+        "--pattern-seed",
+        type=parse_uint64,
+        default=DEFAULT_PATTERN_SEED,
+        help=f"splitmix64-v1 seed, decimal or 0x-prefixed (default: 0x{DEFAULT_PATTERN_SEED:016x})",
+    )
     root.add_argument("--json", help="write all results as JSON")
     root.add_argument("--verbose", action="store_true", help="accepted for consistency with tools/xds_test.py")
     return root
