@@ -99,6 +99,13 @@ void log(const Args &args, const std::string &phase, const std::string &message)
               << elapsed << "s " << message << std::endl;
 }
 
+std::string hex_address(std::uintptr_t address)
+{
+    std::ostringstream output;
+    output << "0x" << std::hex << address;
+    return output.str();
+}
+
 std::string errno_message(int error)
 {
     return std::error_code(error, std::generic_category()).message();
@@ -579,7 +586,8 @@ StreamMetrics stream_once(int fd, const Args &args, const fs::path &input,
     std::uint64_t cursor = args.offset;
     const std::uint64_t end = args.offset + args.file_size;
     log(args, "stream.alloc", "size=" + std::to_string(request_size) +
-        " io_depth=" + std::to_string(io_depth) + " buffer_bytes=" + std::to_string(buffer_size));
+        " io_depth=" + std::to_string(io_depth) + " buffer_bytes=" + std::to_string(buffer_size) +
+        " addr=" + hex_address(base) + " alignment_4k=" + std::to_string(base & 4095));
     const auto started = Clock::now();
     std::uint64_t throttle_sleep_ns = 0;
     while (cursor < end) {
@@ -594,8 +602,14 @@ StreamMetrics stream_once(int fd, const Args &args, const fs::path &input,
                 static_cast<unsigned short>(args.devid), static_cast<unsigned short>(args.vfid),
                 length, static_cast<unsigned long>(base + static_cast<std::uintptr_t>(index) * request_size)
             };
+            log(args, "stream.submit", "cursor=" + std::to_string(cursor) +
+                " slot=" + std::to_string(index) + " file_offset=" + std::to_string(file_offset) +
+                " length=" + std::to_string(length) + " device_address=" +
+                hex_address(static_cast<std::uintptr_t>(parameter.addr)));
             check_io("read_file", read_file(fd, &parameter));
         }
+        log(args, "stream.drain", "cursor=" + std::to_string(cursor) +
+            " requests=" + std::to_string(count));
         check_io("drain_read", drain_read(fd));
         cursor += static_cast<std::uint64_t>(count) * request_size;
         if (cursor < end)
@@ -622,6 +636,11 @@ Verification verify_samples(int fd, const Args &args, const fs::path &input, std
     const auto raw_address = reinterpret_cast<std::uintptr_t>(raw.data());
     const auto address = (raw_address + 4095) & ~static_cast<std::uintptr_t>(4095);
     std::vector<unsigned char> actual(static_cast<std::size_t>(sample_size));
+    log(args, "verify.alloc", "sample_size=" + std::to_string(sample_size) +
+        " raw_buffer_bytes=" + std::to_string(sample_size + 4095) +
+        " raw_addr=" + hex_address(raw_address) + " aligned_addr=" + hex_address(address) +
+        " raw_alignment_4k=" + std::to_string(raw_address & 4095) +
+        " aligned_alignment_4k=" + std::to_string(address & 4095));
     for (std::size_t sample_index = 0; sample_index < offsets.size(); ++sample_index) {
         const auto offset = offsets[sample_index];
         read_parameter parameter {
@@ -629,7 +648,11 @@ Verification verify_samples(int fd, const Args &args, const fs::path &input, std
             static_cast<unsigned short>(args.devid), static_cast<unsigned short>(args.vfid),
             static_cast<unsigned int>(sample_size), static_cast<unsigned long>(address)
         };
+        log(args, "verify.submit", "sample=" + std::to_string(sample_index) + "/" +
+            std::to_string(offsets.size()) + " file_offset=" + std::to_string(offset) +
+            " length=" + std::to_string(sample_size) + " device_address=" + hex_address(address));
         check_io("read_file", read_file(fd, &parameter));
+        log(args, "verify.drain", "sample=" + std::to_string(sample_index));
         check_io("drain_read", drain_read(fd));
         check_acl("aclrtSynchronizeDevice", aclrtSynchronizeDevice());
         check_acl("aclrtMemcpy", aclrtMemcpy(actual.data(), actual.size(),
@@ -651,6 +674,8 @@ Verification verify_samples(int fd, const Args &args, const fs::path &input, std
                     << " sample_size=" << sample_size << " request_size=" << request_size
                     << " first_index=" << first << " first_file_offset=" << offset + first
                     << " device_address=0x" << std::hex << address + first << std::dec
+                    << " actual=0x" << std::hex << static_cast<unsigned int>(actual[first])
+                    << " expected=0x" << static_cast<unsigned int>((offset + first) & 0xff) << std::dec
                     << " mismatch_count=" << mismatch_count;
             throw Failure(message.str());
         }
