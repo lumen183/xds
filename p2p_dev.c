@@ -371,7 +371,7 @@ static struct p2p_io_context *new_io_ctx(struct block_device *bdev, const struct
         return ERR_PTR(-ENOMEM);
     }
 
-    nr = round_up(data_size, HW_LIMIT_SIZE) / HW_LIMIT_SIZE * 10;
+    nr = round_up(data_size, HW_LIMIT_SIZE) / HW_LIMIT_SIZE * 130;
     io_ctx->cmd_list = kvmalloc_array(nr, sizeof(*io_ctx->cmd_list), GFP_KERNEL);
     if (!io_ctx->cmd_list) {
         kfree(io_ctx);
