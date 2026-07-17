@@ -32,6 +32,17 @@
 
 #define HW_LIMIT_SIZE (128U << 10)
 
+#ifndef XDS_ENABLE_HOTPATH_LOGS
+#define XDS_ENABLE_HOTPATH_LOGS 0
+#endif
+
+#if XDS_ENABLE_HOTPATH_LOGS
+#define xds_hotpath_info(...) pr_info(__VA_ARGS__)
+#else
+/* Keep compile-time format checking while removing all runtime log work. */
+#define xds_hotpath_info(...) no_printk(__VA_ARGS__)
+#endif
+
 u64 g_time = 0;
 u64 g_count = 0;
 u64 g_size = 0;
@@ -718,10 +729,10 @@ static int p2p_read_file(struct p2p_batch *batch, void __user *arg)
                desc.desc.addr, desc.desc.size, addr_off);
         return addr_off;
     }
-    pr_info("p2p_dev: READ_FILE request hostpid=%d devid=%u vfid=%u addr=0x%lx size=%lu pa_num=%u pa_size=%u addr_off=%d file_fd=%d bdev_fd=%d ext_num=%u\n",
-            desc.desc.hostpid, desc.desc.devid, desc.desc.vfid,
-            desc.desc.addr, desc.desc.size, pa_num, pa_size, addr_off,
-            desc.file_fd, desc.bdev_fd, desc.ext_num);
+    xds_hotpath_info("p2p_dev: READ_FILE request hostpid=%d devid=%u vfid=%u addr=0x%lx size=%lu pa_num=%u pa_size=%u addr_off=%d file_fd=%d bdev_fd=%d ext_num=%u\n",
+                     desc.desc.hostpid, desc.desc.devid, desc.desc.vfid,
+                     desc.desc.addr, desc.desc.size, pa_num, pa_size, addr_off,
+                     desc.file_fd, desc.bdev_fd, desc.ext_num);
 
     reg_file = fget(desc.file_fd);
     if (!reg_file) {

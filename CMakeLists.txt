@@ -2,9 +2,26 @@ cmake_minimum_required(VERSION 3.16)
 
 project(xds LANGUAGES C)
 
+# Keep the exact compiler arguments available to clangd and the VS Code C/C++
+# extension.  This is especially important for the Python extension, whose
+# Python.h include directory is discovered by CMake.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 option(XDS_ASCEND "Build the Ascend kernel-module backend" ON)
 option(XDS_BUILD_PYTHON "Build the Python module for the selected backend" OFF)
 option(XDS_BUILD_TESTS "Register tests for the selected backend" OFF)
+set(
+    XDS_KERNEL_PROFILE
+    "release"
+    CACHE STRING
+    "Kernel-module profile: release disables hot-path logs; debug enables them"
+)
+set_property(CACHE XDS_KERNEL_PROFILE PROPERTY STRINGS release debug)
+string(TOLOWER "${XDS_KERNEL_PROFILE}" XDS_KERNEL_PROFILE_NORMALIZED)
+if(NOT XDS_KERNEL_PROFILE_NORMALIZED MATCHES "^(release|debug)$")
+    message(FATAL_ERROR
+        "XDS_KERNEL_PROFILE must be 'release' or 'debug', got '${XDS_KERNEL_PROFILE}'")
+endif()
 
 execute_process(
     COMMAND uname -r
@@ -45,7 +62,20 @@ if(XDS_ASCEND)
                    "${XDS_P2P_MODULE_DIR}/p2p_dev_uapi.h" COPYONLY)
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/p2p_mem_query.h"
                    "${XDS_P2P_MODULE_DIR}/p2p_mem_query.h" COPYONLY)
-    file(WRITE "${XDS_P2P_MODULE_DIR}/Makefile" "obj-m += p2p_dev.o\n")
+    set(XDS_P2P_KBUILD_MAKEFILE "obj-m += p2p_dev.o\n")
+    if(XDS_KERNEL_PROFILE_NORMALIZED STREQUAL "debug")
+        string(APPEND XDS_P2P_KBUILD_MAKEFILE
+            "ccflags-y += -DXDS_ENABLE_HOTPATH_LOGS=1\n")
+        set(XDS_HOTPATH_LOG_STATUS "enabled")
+    else()
+        string(APPEND XDS_P2P_KBUILD_MAKEFILE
+            "ccflags-y += -DXDS_ENABLE_HOTPATH_LOGS=0\n")
+        set(XDS_HOTPATH_LOG_STATUS "disabled")
+    endif()
+    file(WRITE "${XDS_P2P_MODULE_DIR}/Makefile" "${XDS_P2P_KBUILD_MAKEFILE}")
+    message(STATUS
+        "XDS kernel profile: ${XDS_KERNEL_PROFILE_NORMALIZED} "
+        "(hot-path logs: ${XDS_HOTPATH_LOG_STATUS})")
 
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/stub.c"
                    "${XDS_STUB_MODULE_DIR}/stub.c" COPYONLY)
