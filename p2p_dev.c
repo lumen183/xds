@@ -207,14 +207,27 @@ static int get_pa_list(const struct va_desc *desc, u64 **_pa_list, unsigned int 
     addr = desc->addr;
     size = desc->size;
     page_size = devmm_get_mem_page_size(&pid, addr, size);
-    if (page_size <= 0) {
-        pr_err("p2p_dev: get page size failed hostpid=%d devid=%u vfid=%u addr=0x%llx size=%llu ret=%d\n",
-               pid.hostpid, pid.devid, pid.vfid, addr, size, page_size);
-        if (!page_size) {
-            page_size = -EINVAL;
-        }
-        return page_size;
-    }
+page_size = devmm_get_mem_page_size(&pid, addr, size);
+if (page_size <= 0) {
+    struct devmm_svm_process_id probe_pid = pid;
+    u32 probe_page_size;
+
+    probe_pid.devid = 0;
+    probe_page_size =
+        devmm_get_mem_page_size(&probe_pid, addr, size);
+
+    pr_err("p2p_dev: SVM cross probe "
+           "hostpid=%d original_devid=%u probe_devid=0 "
+           "vfid=%u addr=0x%llx size=%llu "
+           "original_ret=%d probe_ret=%u\n",
+           pid.hostpid, pid.devid, pid.vfid,
+           addr, size, page_size, probe_page_size);
+
+    if (!page_size)
+        page_size = -EINVAL;
+
+    return page_size;
+}
 
     aligned_addr = round_down(addr, page_size);
     aligned_size = round_up((addr - aligned_addr + size), page_size);
