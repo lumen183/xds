@@ -123,7 +123,12 @@ static PyObject *py_drain_read(PyObject *self, PyObject *args)
         return NULL;
     }
 
+    /* The ioctl may wait for all queued NVMe requests.  Do not hold the GIL
+     * while one P2P fd drains, otherwise another Python worker thread cannot
+     * continue submitting or draining an independent fd. */
+    Py_BEGIN_ALLOW_THREADS
     ret = drain_read(dev_fd);
+    Py_END_ALLOW_THREADS
 
     return PyLong_FromLong((long)ret);
 }
@@ -143,7 +148,10 @@ static PyObject *py_close_p2p_fd(PyObject *self, PyObject *args)
         return NULL;
     }
 
+    /* p2p_release() drains requests left on this fd, so close can block too. */
+    Py_BEGIN_ALLOW_THREADS
     close_p2p_fd(dev_fd);
+    Py_END_ALLOW_THREADS
 
     Py_RETURN_NONE;
 }

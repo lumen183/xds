@@ -489,6 +489,20 @@ python3 tools/dual_npu_dual_nvme_bench.py \
 `0/1`，但 `--npu0-svm-devid` 和 `--npu1-svm-devid` 均为 0。脚本会用两种不同的数据模式
 逐卡校验，避免写错卡时因源数据相同而误判通过。
 
+需要验证“同一 hostpid 下两个线程并发访问两张卡”时，使用单进程双线程版本：
+
+```bash
+python3 tools/dual_npu_dual_nvme_thread_bench.py \
+  --request-size 128K --io-depth 32 \
+  --warmup 2 --iterations 20 \
+  --json dual-thread-results.json --verbose
+```
+
+每个线程仍有独立 buffer、文件和 P2P fd，并在本线程调用 `torch.npu.set_device()`。
+Python 扩展会在 `read_file()`、`drain_read()` 和可能隐式 drain 的 close 期间释放 GIL，
+否则一个线程等待 NVMe 完成时会阻塞另一个线程继续提交。双线程模式比双进程模式共享更多
+ACL/DEVMM 进程状态，应先通过 4KiB、io-depth 1 的正确性测试，再用于性能对照。
+
 要正式支持多卡，而不只是完成该拓扑的实验性验证，还应满足：
 
 1. 接受 `--devid-list 0,1,...`，为每张卡分配独立 tensor、独立 `/dev/p2p_device` fd；
