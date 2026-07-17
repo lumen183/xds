@@ -88,6 +88,37 @@ static struct tracepoint *tp_nvme_setup_cmd;
 unsigned long tp_nvme_setup_cmd_addr;
 module_param(tp_nvme_setup_cmd_addr, ulong, 0400);
 
+/*
+ * SVM lookup diagnostics.  These values are exported read-only through
+ * /sys/module/p2p_dev/parameters/ so a failed lookup can still be inspected
+ * on systems where kernel printk output is unavailable or filtered.
+ */
+static char *diag_build = "svm-probe-v1";
+static unsigned int diag_single_hits;
+static unsigned int diag_batch_hits;
+static int diag_last_path;
+static int diag_desc_hostpid;
+static int diag_current_pid;
+static int diag_current_tgid;
+static int diag_resolved_hostpid;
+static int diag_devid;
+static int diag_vfid;
+static int diag_page_ret = -999;
+static int diag_probe0_ret = -999;
+
+module_param(diag_build, charp, 0444);
+module_param(diag_single_hits, uint, 0444);
+module_param(diag_batch_hits, uint, 0444);
+module_param(diag_last_path, int, 0444);
+module_param(diag_desc_hostpid, int, 0444);
+module_param(diag_current_pid, int, 0444);
+module_param(diag_current_tgid, int, 0444);
+module_param(diag_resolved_hostpid, int, 0444);
+module_param(diag_devid, int, 0444);
+module_param(diag_vfid, int, 0444);
+module_param(diag_page_ret, int, 0444);
+module_param(diag_probe0_ret, int, 0444);
+
 static DEFINE_SPINLOCK(batch_lock);
 static DEFINE_IDR(batch_tree);
 
@@ -173,6 +204,52 @@ static void init_process_id_batch(const struct va_desc_ba *desc, struct devmm_sv
     process_id->vfid = desc->vfid;
 }
 
+static int query_page_size_with_diag(struct devmm_svm_process_id *process_id,
+                                     int desc_hostpid, u64 addr, u64 size,
+                                     bool is_batch)
+{
+    struct devmm_svm_process_id probe_id;
+    int page_size;
+    int probe0_ret = -999;
+
+    if (is_batch) {
+        diag_batch_hits++;
+        diag_last_path = 2;
+    } else {
+        diag_single_hits++;
+        diag_last_path = 1;
+    }
+
+    diag_desc_hostpid = desc_hostpid;
+    diag_current_pid = current->pid;
+    diag_current_tgid = current->tgid;
+    diag_resolved_hostpid = process_id->hostpid;
+    diag_devid = process_id->devid;
+    diag_vfid = process_id->vfid;
+    diag_probe0_ret = -999;
+
+    page_size = devmm_get_mem_page_size(process_id, addr, size);
+    diag_page_ret = page_size;
+
+    /* Probe only.  Never use this result to issue I/O or obtain a PA list. */
+    if (page_size <= 0 && process_id->devid != 0) {
+        probe_id = *process_id;
+        probe_id.devid = 0;
+        probe0_ret = devmm_get_mem_page_size(&probe_id, addr, size);
+        diag_probe0_ret = probe0_ret;
+    }
+
+    if (page_size <= 0) {
+        pr_err("p2p_dev: SVM page query failed path=%s desc_hostpid=%d current_pid=%d current_tgid=%d resolved_hostpid=%d devid=%u vfid=%u addr=0x%llx size=%llu ret=%d probe0_ret=%d\n",
+               is_batch ? "batch" : "single", desc_hostpid,
+               current->pid, current->tgid, process_id->hostpid,
+               process_id->devid, process_id->vfid, addr, size,
+               page_size, probe0_ret);
+    }
+
+    return page_size;
+}
+
 #ifdef DUMP_CONTENT
 static void dump_pa_content(unsigned long pa, unsigned int size)
 {
@@ -206,28 +283,12 @@ static int get_pa_list(const struct va_desc *desc, u64 **_pa_list, unsigned int 
 
     addr = desc->addr;
     size = desc->size;
-    page_size = devmm_get_mem_page_size(&pid, addr, size);
-page_size = devmm_get_mem_page_size(&pid, addr, size);
-if (page_size <= 0) {
-    struct devmm_svm_process_id probe_pid = pid;
-    u32 probe_page_size;
-
-    probe_pid.devid = 0;
-    probe_page_size =
-        devmm_get_mem_page_size(&probe_pid, addr, size);
-
-    pr_err("p2p_dev: SVM cross probe "
-           "hostpid=%d original_devid=%u probe_devid=0 "
-           "vfid=%u addr=0x%llx size=%llu "
-           "original_ret=%d probe_ret=%u\n",
-           pid.hostpid, pid.devid, pid.vfid,
-           addr, size, page_size, probe_page_size);
-
-    if (!page_size)
-        page_size = -EINVAL;
-
-    return page_size;
-}
+    page_size = query_page_size_with_diag(&pid, desc->hostpid, addr, size, false);
+    if (page_size <= 0) {
+        if (!page_size)
+            page_size = -EINVAL;
+        return page_size;
+    }
 
     aligned_addr = round_down(addr, page_size);
     aligned_size = round_up((addr - aligned_addr + size), page_size);
@@ -273,13 +334,10 @@ static int get_pa_list_batch(const struct va_desc_ba *desc, u64 **_pa_list, unsi
 
     addr = desc->addr[0];
     size = desc->size[0];
-    page_size = devmm_get_mem_page_size(&pid, addr, size);
+    page_size = query_page_size_with_diag(&pid, desc->hostpid, addr, size, true);
     if (page_size <= 0) {
-        pr_err("p2p_dev: batch get page size failed hostpid=%d devid=%u vfid=%u addr=0x%llx size=%llu ret=%d\n",
-               pid.hostpid, pid.devid, pid.vfid, addr, size, page_size);
-        if (!page_size) {
+        if (!page_size)
             page_size = -EINVAL;
-        }
         return page_size;
     }
 
