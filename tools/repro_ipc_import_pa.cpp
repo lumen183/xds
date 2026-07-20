@@ -1,6 +1,8 @@
 #include <acl/acl.h>
 
+extern "C" {
 #include "file_p2p_api.h"
+}
 
 #include <cerrno>
 #include <cstdint>
@@ -24,7 +26,7 @@ extern char **environ;
 namespace {
 
 constexpr std::size_t kIpcKeyLength = 65;
-constexpr std::uint64_t kDisablePidValidation = 1;
+constexpr std::uint64_t kDefaultExportFlags = 0;
 
 enum ExitCode {
     kPass = 0,
@@ -48,6 +50,11 @@ struct WireMessage {
     char key[kIpcKeyLength];
     std::uint64_t exporter_address;
     std::int32_t exporter_pid;
+};
+
+struct ImporterHello {
+    std::int32_t bare_pid;
+    aclError error;
 };
 
 std::string acl_error(aclError error)
@@ -265,19 +272,32 @@ int importer_main(int argc, char **argv)
     if (!parse_options(argc, argv, 3, &options))
         return kUsage;
 
-    WireMessage message {};
     const int control_fd = static_cast<int>(fd_value);
-    if (!read_exact(control_fd, &message, sizeof(message))) {
-        std::cerr << "IMPORT_FAIL stage=receive errno=" << errno << std::endl;
-        return kSetupFailure;
-    }
-    ::close(control_fd);
     std::vector<unsigned char> expected;
     if (!load_expected(options, &expected))
         return kSetupFailure;
 
     try {
         AclRuntime runtime(options.device);
+        ImporterHello hello {};
+        hello.error = aclrtDeviceGetBareTgid(&hello.bare_pid);
+        if (!write_exact(control_fd, &hello, sizeof(hello))) {
+            std::cerr << "IMPORT_FAIL stage=send_bare_pid errno=" << errno << std::endl;
+            ::close(control_fd);
+            return kSetupFailure;
+        }
+        if (hello.error != ACL_ERROR_NONE) {
+            std::cerr << "IMPORT_FAIL stage=aclrtDeviceGetBareTgid acl=" << hello.error << std::endl;
+            ::close(control_fd);
+            return kSetupFailure;
+        }
+        WireMessage message {};
+        if (!read_exact(control_fd, &message, sizeof(message))) {
+            std::cerr << "IMPORT_FAIL stage=receive_key errno=" << errno << std::endl;
+            ::close(control_fd);
+            return kSetupFailure;
+        }
+        ::close(control_fd);
         void *imported = nullptr;
         const aclError error = aclrtIpcMemImportByKey(&imported, message.key, 0);
         if (error != ACL_ERROR_NONE) {
@@ -334,18 +354,9 @@ int parent_main(int argc, char **argv)
         WireMessage message {};
         message.exporter_address = reinterpret_cast<std::uintptr_t>(allocated);
         message.exporter_pid = static_cast<std::int32_t>(::getpid());
-        error = aclrtIpcMemGetExportKey(allocated, options.size, message.key, sizeof(message.key),
-                                        kDisablePidValidation);
-        if (error != ACL_ERROR_NONE) {
-            std::cerr << "SETUP_FAIL aclrtIpcMemGetExportKey=" << error << std::endl;
-            aclrtFree(allocated);
-            return kSetupFailure;
-        }
-
         int sockets[2];
         if (::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) != 0) {
             std::cerr << "SETUP_FAIL socketpair: " << std::strerror(errno) << std::endl;
-            aclrtIpcMemClose(message.key);
             aclrtFree(allocated);
             return kSetupFailure;
         }
@@ -369,8 +380,27 @@ int parent_main(int argc, char **argv)
         int importer_result = kSetupFailure;
         if (spawn_error != 0) {
             std::cerr << "SETUP_FAIL posix_spawn: " << std::strerror(spawn_error) << std::endl;
-        } else if (!write_exact(sockets[0], &message, sizeof(message))) {
-            std::cerr << "SETUP_FAIL send IPC key: " << std::strerror(errno) << std::endl;
+        } else {
+            ImporterHello hello {};
+            if (!read_exact(sockets[0], &hello, sizeof(hello))) {
+                std::cerr << "SETUP_FAIL receive importer PID: " << std::strerror(errno) << std::endl;
+            } else if (hello.error != ACL_ERROR_NONE) {
+                std::cerr << "SETUP_FAIL importer aclrtDeviceGetBareTgid=" << hello.error << std::endl;
+            } else {
+                std::cout << "IMPORTER bare_pid=" << hello.bare_pid << std::endl;
+                error = aclrtIpcMemGetExportKey(allocated, options.size, message.key,
+                                                sizeof(message.key), kDefaultExportFlags);
+                if (error != ACL_ERROR_NONE) {
+                    std::cerr << "SETUP_FAIL aclrtIpcMemGetExportKey=" << error << std::endl;
+                } else {
+                    error = aclrtIpcMemSetImportPid(message.key, &hello.bare_pid, 1);
+                    if (error != ACL_ERROR_NONE) {
+                        std::cerr << "SETUP_FAIL aclrtIpcMemSetImportPid=" << error << std::endl;
+                    } else if (!write_exact(sockets[0], &message, sizeof(message))) {
+                        std::cerr << "SETUP_FAIL send IPC key: " << std::strerror(errno) << std::endl;
+                    }
+                }
+            }
         }
         ::close(sockets[0]);
         if (spawn_error == 0) {
@@ -379,9 +409,11 @@ int parent_main(int argc, char **argv)
                 importer_result = WEXITSTATUS(status);
         }
 
-        const aclError close_error = aclrtIpcMemClose(message.key);
-        if (close_error != ACL_ERROR_NONE)
-            std::cerr << "EXPORT_WARN aclrtIpcMemClose=" << close_error << std::endl;
+        if (message.key[0] != '\0') {
+            const aclError close_error = aclrtIpcMemClose(message.key);
+            if (close_error != ACL_ERROR_NONE)
+                std::cerr << "EXPORT_WARN aclrtIpcMemClose=" << close_error << std::endl;
+        }
         aclrtFree(allocated);
 
         std::cout << "SUMMARY same_process=" << direct_result

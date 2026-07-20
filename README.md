@@ -130,7 +130,7 @@ ls -l /lib/modules/$(uname -r)/build/Makefile
 构建入口：
 
 ```bash
-./build.sh [-X on|off] [-P] [-t build|run] [-i on|off]
+./build.sh [-X on|off] [-P] [-t build|run] [-i on|off] [-M release|debug]
 ```
 
 | 参数 | 含义 |
@@ -140,6 +140,8 @@ ls -l /lib/modules/$(uname -r)/build/Makefile
 | `-P` | 构建 Python C 扩展。 |
 | `-t run` | 构建并运行测试；真实模式只做扩展 API smoke，不访问真机设备。 |
 | `-i on` | 增量构建。 |
+| `-M release` | 性能版本，编译时移除逐 I/O 热路径日志；默认值。 |
+| `-M debug` | 诊断版本，保留逐 I/O 热路径日志。 |
 
 例如：
 
@@ -150,6 +152,22 @@ ls -l /lib/modules/$(uname -r)/build/Makefile
 # 目标机编译真实模块和扩展
 KDIR=/lib/modules/$(uname -r)/build ./build.sh -X on -P
 ```
+
+内核模块默认使用 `release` profile，逐 I/O 热路径日志会在编译时移除。通过 `-M`
+可以快速切换：
+
+```bash
+# 性能测试版本（推荐）
+./build.sh -X on -P -M release
+
+# 诊断版本：保留逐 I/O pr_info，不应用于性能数据采集
+./build.sh -X on -P -M debug
+```
+
+模块位于 `build/kernel/p2p_dev/p2p_dev.ko`。默认非增量构建会先清理 `build`，避免把
+两种 profile 的产物混淆；如需同时保留，请在切换前复制模块。`release` 仍采用内核
+Kbuild 的正常优化参数；profile 的区别仅是是否编译逐 I/O 诊断日志，避免用 `-O0`
+改变内核代码行为和性能特征。
 
 若内核启用 module versions，额外提供 Ascend 驱动的符号文件：
 

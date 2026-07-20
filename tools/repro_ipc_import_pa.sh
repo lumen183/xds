@@ -24,6 +24,15 @@ if (($# < 2 || $# > 6)); then
     exit 2
 fi
 
+if [[ -f "$1" ]] && command -v findmnt >/dev/null 2>&1; then
+    input_source="$(findmnt -n -o SOURCE -T "$1" 2>/dev/null || true)"
+    if [[ -n "${input_source}" && "${input_source}" != "$2" ]]; then
+        echo "WARNING: INPUT is on '${input_source}', but BDEV is '$2'." >&2
+        echo "         FIEMAP offsets are only valid for the matching backing block device." >&2
+        echo "         For an unambiguous smoke, pass BDEV as both INPUT and BDEV." >&2
+    fi
+fi
+
 find_ascend_include() {
     local candidate
     for candidate in \

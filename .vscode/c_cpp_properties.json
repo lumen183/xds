@@ -1,0 +1,45 @@
+{
+    "configurations": [
+        {
+            "name": "xds Linux",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-arm64",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+            "includePath": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/file_p2p",
+                "${workspaceFolder}/build/kernel/p2p_dev",
+                "${workspaceFolder}/build/kernel/stub",
+                "${env:KDIR}/include",
+                "${env:KDIR}/include/uapi",
+                "${env:KDIR}/include/generated",
+                "${env:KDIR}/include/generated/uapi",
+                "${env:KDIR}/arch/arm64/include",
+                "${env:KDIR}/arch/arm64/include/generated",
+                "${env:KDIR}/arch/arm64/include/uapi",
+                "${env:KDIR}/arch/arm64/include/generated/uapi",
+                "${env:ASCEND_HOME_PATH}/include",
+                "${env:ASCEND_HOME_PATH}/runtime/include",
+                "${env:ASCEND_HOME_PATH}/compiler/include"
+            ],
+            "defines": [
+                "__aarch64__"
+            ],
+            "browse": {
+                "path": [
+                    "${workspaceFolder}",
+                    "${workspaceFolder}/file_p2p",
+                    "${env:KDIR}/include",
+                    "${env:KDIR}/include/uapi",
+                    "${env:KDIR}/include/generated",
+                    "${env:KDIR}/arch/arm64/include",
+                    "${env:KDIR}/arch/arm64/include/generated"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ],
+    "version": 4
+}

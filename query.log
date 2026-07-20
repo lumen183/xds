@@ -1,0 +1,406 @@
+/usr/local/Ascend/driver/kernel/svm_peer_mem/svm_peer_mem.c:68:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svm_peer_mem/svm_peer_mem.c:93:    struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svm_peer_mem/svm_peer_mem.c:127:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svm_peer_mem/svm_peer_mem.c:144:    page_size = devmm_get_mem_page_size(&process_id, addr, size);
+/usr/local/Ascend/driver/kernel/svm_peer_mem/svm_peer_mem.c:212:    ret = devmm_get_mem_pa_list(&mm_context->process_id, mm_context->va_aligned_start, mm_context->aligned_size,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_master_pm_proc_mng.c:269:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/pm_adapt/devmm_pm_vpc.c:201:    struct devmm_svm_process_id process_id = {0};
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/pm_adapt/devmm_pm_vpc.c:446:    struct devmm_svm_process_id *process_id, struct devmm_svm_process **svm_proc)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_master_query.c:52:int devmm_svm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_master_query.c:83:int devmm_shm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_master_query.c:169:int devmm_svm_get_and_pin_pa_list(struct devmm_svm_process_id *process_id, u64 aligned_va, u64 aligned_size,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_master_query.c:210:int devmm_shm_get_pa_list(struct devmm_svm_process_id *process_id, u64 aligned_va, u64 aligned_size,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_master_query.c:216:void devmm_svm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_master_query.c:231:void devmm_shm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_master_query.c:445:    struct devmm_svm_process_id process_id = {.hostpid = mem_info->hostpid, .devid = 0, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_master_query.c:568:    struct devmm_svm_process_id process_id = {.hostpid = current->tgid, .devid = 0, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/svm_master_dma_desc_mng.c:433:    struct devmm_svm_process_id process_id = {0};
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/svm_master_dma_desc_mng.c:466:    struct devmm_svm_process_id process_id = {0};
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/devmm_proc_mem_copy.c:2380:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/svm_master_memset.c:122:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/devmm_channel.c:113:    struct devmm_svm_process_id *process_id = &flg_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/devmm_channel.c:145:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/devmm_channel.c:248:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/devmm_channel.c:278:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/inc/devmm_vpc_mng_msg_def.h:47:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/inc/svm_shmem_interprocess.h:41:    u64 va, u64 *owner_va, struct devmm_svm_process_id *id, u32 *sdid);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/devmm_proc_info.c:530:    struct devmm_svm_process_id *process_id = &flg_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/devmm_proc_info.c:2200:    struct devmm_svm_process_id process_id = {devmm_get_current_pid(), {0}, 0};
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/comm/devmm_proc_info.c:3284:u32 devmm_shm_get_page_size(struct devmm_svm_process_id *process_id, u64 va, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:36:static int devmm_get_addr_type(struct devmm_svm_process_id *process_id, u64 addr, size_t size, unsigned int *addr_flag)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:58:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:93:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:117:EXPORT_SYMBOL_GPL(devmm_get_mem_pa_list);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:119:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:142:STATIC u32 devmm_svm_get_dev_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:168:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:187:EXPORT_SYMBOL_GPL(devmm_get_mem_page_size);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:192:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:194:    return devmm_get_mem_pa_list(&process_id, addr, size, pa_list, pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:201:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:212:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.c:214:    return devmm_get_mem_page_size(&process_id, addr, size);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_proc_mng.c:417:    struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_proc_mng.c:441:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_proc_mng.c:471:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_proc_mng.c:778:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_proc_mng.c:791:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_proc_mng.c:810:static struct devmm_svm_process *devmm_sreach_svm_proc(u32 node_tag, struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_proc_mng.c:834:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_proc_mng.c:892:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/devmm_common.h:203:int devmm_shm_inform_host_get_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/devmm_common.h:204:int devmm_shm_inform_host_put_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/devmm_dev.c:1147:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/devmm_dev.c:1225:    const struct devmm_svm_process_id *process_id, const struct devmm_chan_handlers_st *msg_process, u32 msg_id)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/svm_proc_mng.h:65:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/svm_proc_mng.h:66:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/svm_proc_mng.h:82:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/svm_proc_mng.h:84:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/devmm_proc_info.h:165:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/devmm_proc_info.h:180:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/devmm_proc_info.h:192:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/devmm_proc_info.h:414:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/devmm_proc_info.h:437:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/devmm_proc_info.h:1039:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/devmm_channel.h:87:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/inc/devmm_channel.h:226:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:33:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:34:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:36:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:38:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:42:int devmm_svm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:43:int devmm_shm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:45:int devmm_svm_get_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:47:int devmm_svm_get_and_pin_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:49:int devmm_shm_get_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:50:void devmm_shm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:51:void devmm_svm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:52:u32 devmm_shm_get_page_size(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/svm_mem_query.h:53:int devmm_get_mem_side(struct devmm_svm_process_id *process_id, u64 addr, u32 *side);
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/common/devmm_page_cache.c:525:    struct devmm_svm_process_id process_id = {.hostpid = hostpid, .devid = 0, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_shmem_interprocess.c:106:    u64 va, u64 *owner_va, struct devmm_svm_process_id *id, u32 *sdid)
+/usr/local/Ascend/driver/kernel/svmdrv/pmaster/svm_shmem_interprocess.c:139:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/devmm_vm_adapt.c:1188:    u64 va, u64 *owner_va, struct devmm_svm_process_id *id, u32 *sdid)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/devmm_vm_adapt.c:1216:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/devmm_vm_adapt.c:1221:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/devmm_vm_adapt.c:1227:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/devmm_vm_adapt.c:1233:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:36:static int devmm_get_addr_type(struct devmm_svm_process_id *process_id, u64 addr, size_t size, unsigned int *addr_flag)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:58:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:93:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:117:EXPORT_SYMBOL_GPL(devmm_get_mem_pa_list);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:119:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:142:STATIC u32 devmm_svm_get_dev_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:168:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:187:EXPORT_SYMBOL_GPL(devmm_get_mem_page_size);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:192:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:194:    return devmm_get_mem_pa_list(&process_id, addr, size, pa_list, pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:201:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:212:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.c:214:    return devmm_get_mem_page_size(&process_id, addr, size);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:33:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:34:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:36:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:38:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:42:int devmm_svm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:43:int devmm_shm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:45:int devmm_svm_get_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:47:int devmm_svm_get_and_pin_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:49:int devmm_shm_get_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:50:void devmm_shm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:51:void devmm_svm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:52:u32 devmm_shm_get_page_size(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_mem_query.h:53:int devmm_get_mem_side(struct devmm_svm_process_id *process_id, u64 addr, u32 *side);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_proc_mng.c:417:    struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_proc_mng.c:441:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_proc_mng.c:471:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_proc_mng.c:778:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_proc_mng.c:791:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_proc_mng.c:810:static struct devmm_svm_process *devmm_sreach_svm_proc(u32 node_tag, struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_proc_mng.c:834:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/svm_proc_mng.c:892:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/devmm_common.h:203:int devmm_shm_inform_host_get_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/devmm_common.h:204:int devmm_shm_inform_host_put_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/devmm_dev.c:1147:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/devmm_dev.c:1225:    const struct devmm_svm_process_id *process_id, const struct devmm_chan_handlers_st *msg_process, u32 msg_id)
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/svm_proc_mng.h:65:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/svm_proc_mng.h:66:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/svm_proc_mng.h:82:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/svm_proc_mng.h:84:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/devmm_channel.h:87:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/devmm_channel.h:226:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/devmm_proc_info.h:165:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/devmm_proc_info.h:180:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/devmm_proc_info.h:192:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/devmm_proc_info.h:414:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/devmm_proc_info.h:437:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/inc/devmm_proc_info.h:1039:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/svm_master_dma_desc_mng.c:433:    struct devmm_svm_process_id process_id = {0};
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/svm_master_dma_desc_mng.c:466:    struct devmm_svm_process_id process_id = {0};
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/common/devmm_page_cache.c:525:    struct devmm_svm_process_id process_id = {.hostpid = hostpid, .devid = 0, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/svm_master_memset.c:122:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/inc/devmm_vpc_mng_msg_def.h:47:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/inc/svm_shmem_interprocess.h:41:    u64 va, u64 *owner_va, struct devmm_svm_process_id *id, u32 *sdid);
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/devmm_channel.c:113:    struct devmm_svm_process_id *process_id = &flg_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/devmm_channel.c:145:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/devmm_channel.c:248:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/devmm_channel.c:278:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/devmm_proc_info.c:530:    struct devmm_svm_process_id *process_id = &flg_msg->head.process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/devmm_proc_info.c:2200:    struct devmm_svm_process_id process_id = {devmm_get_current_pid(), {0}, 0};
+/usr/local/Ascend/driver/kernel/svmdrv/vmaster/comm/devmm_proc_info.c:3284:u32 devmm_shm_get_page_size(struct devmm_svm_process_id *process_id, u64 va, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:36:static int devmm_get_addr_type(struct devmm_svm_process_id *process_id, u64 addr, size_t size, unsigned int *addr_flag)
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:58:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:93:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:117:EXPORT_SYMBOL_GPL(devmm_get_mem_pa_list);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:119:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:142:STATIC u32 devmm_svm_get_dev_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:168:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:187:EXPORT_SYMBOL_GPL(devmm_get_mem_page_size);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:192:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:194:    return devmm_get_mem_pa_list(&process_id, addr, size, pa_list, pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:201:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:212:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.c:214:    return devmm_get_mem_page_size(&process_id, addr, size);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_proc_mng.c:417:    struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_proc_mng.c:441:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_proc_mng.c:471:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_proc_mng.c:778:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_proc_mng.c:791:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_proc_mng.c:810:static struct devmm_svm_process *devmm_sreach_svm_proc(u32 node_tag, struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_proc_mng.c:834:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_proc_mng.c:892:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/devmm_common.h:203:int devmm_shm_inform_host_get_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/devmm_common.h:204:int devmm_shm_inform_host_put_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/common/devmm_dev.c:1147:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel/svmdrv/common/devmm_dev.c:1225:    const struct devmm_svm_process_id *process_id, const struct devmm_chan_handlers_st *msg_process, u32 msg_id)
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/svm_proc_mng.h:65:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/svm_proc_mng.h:66:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/svm_proc_mng.h:82:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/svm_proc_mng.h:84:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/devmm_channel.h:87:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/devmm_channel.h:226:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/devmm_proc_info.h:165:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/devmm_proc_info.h:180:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/devmm_proc_info.h:192:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/devmm_proc_info.h:414:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/devmm_proc_info.h:437:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel/svmdrv/common/inc/devmm_proc_info.h:1039:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:33:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:34:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:36:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:38:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:42:int devmm_svm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:43:int devmm_shm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:45:int devmm_svm_get_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:47:int devmm_svm_get_and_pin_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:49:int devmm_shm_get_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:50:void devmm_shm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:51:void devmm_svm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:52:u32 devmm_shm_get_page_size(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel/svmdrv/common/svm_mem_query.h:53:int devmm_get_mem_side(struct devmm_svm_process_id *process_id, u64 addr, u32 *side);
+/usr/local/Ascend/driver/kernel/svmdrv/common/devmm_page_cache.c:525:    struct devmm_svm_process_id process_id = {.hostpid = hostpid, .devid = 0, .vfid = 0};
+/usr/local/Ascend/driver/kernel/dev_inc/inc/svm_cmd.h:36:struct devmm_svm_process_id {
+/usr/local/Ascend/driver/kernel/dev_inc/inc/svm_cmd.h:247:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svm_peer_mem/svm_peer_mem.c:68:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svm_peer_mem/svm_peer_mem.c:93:    struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svm_peer_mem/svm_peer_mem.c:127:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svm_peer_mem/svm_peer_mem.c:144:    page_size = devmm_get_mem_page_size(&process_id, addr, size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svm_peer_mem/svm_peer_mem.c:212:    ret = devmm_get_mem_pa_list(&mm_context->process_id, mm_context->va_aligned_start, mm_context->aligned_size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/devmm_vm_adapt.c:1188:    u64 va, u64 *owner_va, struct devmm_svm_process_id *id, u32 *sdid)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/devmm_vm_adapt.c:1216:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/devmm_vm_adapt.c:1221:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/devmm_vm_adapt.c:1227:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/devmm_vm_adapt.c:1233:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_master_pm_proc_mng.c:269:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/svm_master_dma_desc_mng.c:433:    struct devmm_svm_process_id process_id = {0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/svm_master_dma_desc_mng.c:466:    struct devmm_svm_process_id process_id = {0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/pm_adapt/devmm_pm_vpc.c:201:    struct devmm_svm_process_id process_id = {0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/pm_adapt/devmm_pm_vpc.c:446:    struct devmm_svm_process_id *process_id, struct devmm_svm_process **svm_proc)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/svm_master_memset.c:122:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/devmm_channel.c:113:    struct devmm_svm_process_id *process_id = &flg_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/devmm_channel.c:145:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/devmm_channel.c:248:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/devmm_channel.c:278:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/inc/devmm_vpc_mng_msg_def.h:47:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/inc/svm_shmem_interprocess.h:41:    u64 va, u64 *owner_va, struct devmm_svm_process_id *id, u32 *sdid);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/devmm_proc_info.c:530:    struct devmm_svm_process_id *process_id = &flg_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/devmm_proc_info.c:2200:    struct devmm_svm_process_id process_id = {devmm_get_current_pid(), {0}, 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/comm/devmm_proc_info.c:3284:u32 devmm_shm_get_page_size(struct devmm_svm_process_id *process_id, u64 va, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:36:static int devmm_get_addr_type(struct devmm_svm_process_id *process_id, u64 addr, size_t size, unsigned int *addr_flag)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:58:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:93:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:117:EXPORT_SYMBOL_GPL(devmm_get_mem_pa_list);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:119:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:142:STATIC u32 devmm_svm_get_dev_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:168:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:187:EXPORT_SYMBOL_GPL(devmm_get_mem_page_size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:192:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:194:    return devmm_get_mem_pa_list(&process_id, addr, size, pa_list, pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:201:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:212:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.c:214:    return devmm_get_mem_page_size(&process_id, addr, size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:33:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:34:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:36:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:38:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:42:int devmm_svm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:43:int devmm_shm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:45:int devmm_svm_get_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:47:int devmm_svm_get_and_pin_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:49:int devmm_shm_get_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:50:void devmm_shm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:51:void devmm_svm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:52:u32 devmm_shm_get_page_size(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_mem_query.h:53:int devmm_get_mem_side(struct devmm_svm_process_id *process_id, u64 addr, u32 *side);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/devmm_common.h:203:int devmm_shm_inform_host_get_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/devmm_common.h:204:int devmm_shm_inform_host_put_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_proc_mng.c:417:    struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_proc_mng.c:441:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_proc_mng.c:471:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_proc_mng.c:778:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_proc_mng.c:791:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_proc_mng.c:810:static struct devmm_svm_process *devmm_sreach_svm_proc(u32 node_tag, struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_proc_mng.c:834:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/svm_proc_mng.c:892:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/devmm_dev.c:1147:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/devmm_dev.c:1225:    const struct devmm_svm_process_id *process_id, const struct devmm_chan_handlers_st *msg_process, u32 msg_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/svm_proc_mng.h:65:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/svm_proc_mng.h:66:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/svm_proc_mng.h:82:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/svm_proc_mng.h:84:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/devmm_proc_info.h:165:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/devmm_proc_info.h:180:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/devmm_proc_info.h:192:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/devmm_proc_info.h:414:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/devmm_proc_info.h:437:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/devmm_proc_info.h:1039:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/devmm_channel.h:87:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/inc/devmm_channel.h:226:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_master_query.c:52:int devmm_svm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_master_query.c:83:int devmm_shm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_master_query.c:169:int devmm_svm_get_and_pin_pa_list(struct devmm_svm_process_id *process_id, u64 aligned_va, u64 aligned_size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_master_query.c:210:int devmm_shm_get_pa_list(struct devmm_svm_process_id *process_id, u64 aligned_va, u64 aligned_size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_master_query.c:216:void devmm_svm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_master_query.c:231:void devmm_shm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_master_query.c:445:    struct devmm_svm_process_id process_id = {.hostpid = mem_info->hostpid, .devid = 0, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_master_query.c:568:    struct devmm_svm_process_id process_id = {.hostpid = current->tgid, .devid = 0, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/vmaster/common/devmm_page_cache.c:525:    struct devmm_svm_process_id process_id = {.hostpid = hostpid, .devid = 0, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/devmm_proc_mem_copy.c:2380:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:36:static int devmm_get_addr_type(struct devmm_svm_process_id *process_id, u64 addr, size_t size, unsigned int *addr_flag)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:58:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:93:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:117:EXPORT_SYMBOL_GPL(devmm_get_mem_pa_list);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:119:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:142:STATIC u32 devmm_svm_get_dev_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:168:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:187:EXPORT_SYMBOL_GPL(devmm_get_mem_page_size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:192:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:194:    return devmm_get_mem_pa_list(&process_id, addr, size, pa_list, pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:201:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:212:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.c:214:    return devmm_get_mem_page_size(&process_id, addr, size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_proc_mng.c:417:    struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_proc_mng.c:441:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_proc_mng.c:471:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_proc_mng.c:778:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_proc_mng.c:791:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_proc_mng.c:810:static struct devmm_svm_process *devmm_sreach_svm_proc(u32 node_tag, struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_proc_mng.c:834:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_proc_mng.c:892:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/devmm_common.h:203:int devmm_shm_inform_host_get_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/devmm_common.h:204:int devmm_shm_inform_host_put_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/devmm_dev.c:1147:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/devmm_dev.c:1225:    const struct devmm_svm_process_id *process_id, const struct devmm_chan_handlers_st *msg_process, u32 msg_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/svm_proc_mng.h:65:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/svm_proc_mng.h:66:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/svm_proc_mng.h:82:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/svm_proc_mng.h:84:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/devmm_proc_info.h:165:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/devmm_proc_info.h:180:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/devmm_proc_info.h:192:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/devmm_proc_info.h:414:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/devmm_proc_info.h:437:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/devmm_proc_info.h:1039:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/devmm_channel.h:87:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/inc/devmm_channel.h:226:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:33:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:34:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:36:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:38:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:42:int devmm_svm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:43:int devmm_shm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:45:int devmm_svm_get_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:47:int devmm_svm_get_and_pin_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:49:int devmm_shm_get_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:50:void devmm_shm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:51:void devmm_svm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:52:u32 devmm_shm_get_page_size(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/svm_mem_query.h:53:int devmm_get_mem_side(struct devmm_svm_process_id *process_id, u64 addr, u32 *side);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/common/devmm_page_cache.c:525:    struct devmm_svm_process_id process_id = {.hostpid = hostpid, .devid = 0, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/svm_master_dma_desc_mng.c:433:    struct devmm_svm_process_id process_id = {0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/svm_master_dma_desc_mng.c:466:    struct devmm_svm_process_id process_id = {0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/svm_master_memset.c:122:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/devmm_channel.c:113:    struct devmm_svm_process_id *process_id = &flg_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/devmm_channel.c:145:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/devmm_channel.c:248:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/devmm_channel.c:278:    struct devmm_svm_process_id *process_id = &fault_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/inc/devmm_vpc_mng_msg_def.h:47:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/inc/svm_shmem_interprocess.h:41:    u64 va, u64 *owner_va, struct devmm_svm_process_id *id, u32 *sdid);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/devmm_proc_info.c:530:    struct devmm_svm_process_id *process_id = &flg_msg->head.process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/devmm_proc_info.c:2200:    struct devmm_svm_process_id process_id = {devmm_get_current_pid(), {0}, 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/comm/devmm_proc_info.c:3284:u32 devmm_shm_get_page_size(struct devmm_svm_process_id *process_id, u64 va, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_shmem_interprocess.c:106:    u64 va, u64 *owner_va, struct devmm_svm_process_id *id, u32 *sdid)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/pmaster/svm_shmem_interprocess.c:139:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:36:static int devmm_get_addr_type(struct devmm_svm_process_id *process_id, u64 addr, size_t size, unsigned int *addr_flag)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:58:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:93:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:117:EXPORT_SYMBOL_GPL(devmm_get_mem_pa_list);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:119:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:142:STATIC u32 devmm_svm_get_dev_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:168:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:187:EXPORT_SYMBOL_GPL(devmm_get_mem_page_size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:192:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:194:    return devmm_get_mem_pa_list(&process_id, addr, size, pa_list, pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:201:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:212:    struct devmm_svm_process_id process_id = {.hostpid = tgid, .devid = devid, .vfid = 0};
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.c:214:    return devmm_get_mem_page_size(&process_id, addr, size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/devmm_common.h:203:int devmm_shm_inform_host_get_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/devmm_common.h:204:int devmm_shm_inform_host_put_pages(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_proc_mng.c:417:    struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_proc_mng.c:441:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_proc_mng.c:471:    struct devmm_svm_process_id *process_id, int dev_pid)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_proc_mng.c:778:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_proc_mng.c:791:    struct devmm_svm_process_id *process_id = (struct devmm_svm_process_id *)(uintptr_t)cmp_arg;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_proc_mng.c:810:static struct devmm_svm_process *devmm_sreach_svm_proc(u32 node_tag, struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_proc_mng.c:834:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_proc_mng.c:892:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/devmm_proc_info.h:165:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/devmm_proc_info.h:180:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/devmm_proc_info.h:192:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/devmm_proc_info.h:414:    struct devmm_svm_process_id proc_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/devmm_proc_info.h:437:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/devmm_proc_info.h:1039:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/dev_inc/inc/svm_cmd.h:36:struct devmm_svm_process_id {
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/dev_inc/inc/svm_cmd.h:247:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/svm_proc_mng.h:65:struct devmm_svm_process *devmm_svm_proc_get_by_process_id(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/svm_proc_mng.h:66:struct devmm_svm_process *devmm_svm_proc_get_by_process_id_ex(struct devmm_svm_process_id *process_id);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/svm_proc_mng.h:82:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/svm_proc_mng.h:84:    struct devmm_svm_process_id *process_id, int dev_pid);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/devmm_channel.h:87:    struct devmm_svm_process_id process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/inc/devmm_channel.h:226:    struct devmm_svm_process_id p2p_owner_process_id;
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:33:bool devmm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:34:int devmm_get_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:36:void devmm_put_mem_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:38:u32 devmm_get_mem_page_size(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:42:int devmm_svm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:43:int devmm_shm_check_addr_valid(struct devmm_svm_process_id *process_id, u64 addr, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:45:int devmm_svm_get_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:47:int devmm_svm_get_and_pin_pa_list(struct devmm_svm_process_id *process_id,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:49:int devmm_shm_get_pa_list(struct devmm_svm_process_id *process_id, u64 addr, u64 size, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:50:void devmm_shm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:51:void devmm_svm_put_pa_list(struct devmm_svm_process_id *process_id, u64 va, u64 *pa_list, u32 pa_num);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:52:u32 devmm_shm_get_page_size(struct devmm_svm_process_id *process_id, u64 va, u64 size);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/svm_mem_query.h:53:int devmm_get_mem_side(struct devmm_svm_process_id *process_id, u64 addr, u32 *side);
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/devmm_dev.c:1147:int devmm_svm_proc_and_heap_get(struct devmm_svm_process_id *process_id, u64 va,
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/devmm_dev.c:1225:    const struct devmm_svm_process_id *process_id, const struct devmm_chan_handlers_st *msg_process, u32 msg_id)
+/usr/local/Ascend/driver/kernel.bak.2026-07-13-042722/svmdrv/common/devmm_page_cache.c:525:    struct devmm_svm_process_id process_id = {.hostpid = hostpid, .devid = 0, .vfid = 0};

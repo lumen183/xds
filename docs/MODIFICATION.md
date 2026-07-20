@@ -21,7 +21,7 @@
 构建命令统一为：
 
 ```bash
-./build.sh [-X on|off] [-P] [-t build|run] [-i on|off]
+./build.sh [-X on|off] [-P] [-t build|run] [-i on|off] [-M release|debug]
 ```
 
 | 参数 | 默认值 | 行为 |
@@ -31,6 +31,7 @@
 | `-t build` | 不执行 | 构建测试和测试依赖，但不运行测试。 |
 | `-t run` | 不执行 | 自动构建测试依赖，然后运行测试。 |
 | `-i on\|off` | `off` | `on` 保留构建缓存；`off` 清理 `build/` 后完整重建。 |
+| `-M release\|debug` | `release` | `release` 编译时移除热路径日志；`debug` 保留逐 I/O 日志。 |
 
 参数组合的实际语义如下：
 
@@ -40,6 +41,9 @@
 
 ./build.sh -P
     真实模式，编译内核模块和真实 file_p2p Python C 扩展
+
+./build.sh -P -M debug
+    真实模式诊断版本，保留逐 I/O 内核日志
 
 ./build.sh -X off
     只编译 build/python/file_p2p.py mock
